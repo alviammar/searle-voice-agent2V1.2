@@ -92,19 +92,67 @@ function logVoiceSource(callId, provider, voice, cached=false){
   console.log("------------------------------------------------------------\n");
 }
 
+const LEARN_DEDUPE_WINDOW_MS = 8000;
+const recentLearningEvents = new Map();
+function normalizeIntentName(value){
+  const x=String(value||"").trim().toLowerCase();
+  const aliases={unknown_extor:"other_extor",precautions:"other_extor",kidney_precautions:"kidney_liver",renal_precautions:"kidney_liver",liver_precautions:"kidney_liver",interaction:"other_medicines",interactions:"other_medicines",medicine_interaction:"other_medicines",drug_interaction:"other_medicines",dose:"dose_frequency",dosage_frequency:"dose_frequency",competitors:"competitor",alternatives:"competitor",cost:"price"};
+  return aliases[x]||x;
+}
+function learningText(value){ return String(value||"").toLowerCase().replace(/[؟?۔.,!،;؛:()"']/g," ").replace(/\s+/g," ").trim(); }
+function hasLearnAny(t,list){ return list.some(x=>t.includes(x)); }
+function inferLearningIntent(text, proposedIntent){
+  const t=learningText(text); let proposed=normalizeIntentName(proposedIntent);
+  if(hasLearnAny(t,["kidney","renal","گردے","گردہ","gurday","gurda"])) return "kidney_liver";
+  if(hasLearnAny(t,["liver","hepatic","جگر","jigar"])) return "kidney_liver";
+  if(hasLearnAny(t,["pregnant","pregnancy","حمل","حاملہ","hamal"])) return "pregnancy";
+  if(hasLearnAny(t,["breastfeed","breastfeeding","دودھ پلا","feeding baby","nursing"])) return "breastfeeding";
+  if(hasLearnAny(t,["potassium","پوٹاشیم"])) return "potassium";
+  if(hasLearnAny(t,["under 18","under18","18 years","18 سال","child","children","teen","بچہ","بچوں"])) return "under18";
+  if(hasLearnAny(t,["twice","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو گولی","دن میں دو"])) return "dose_frequency";
+  if(hasLearnAny(t,["price","cost","rate","قیمت","دام","روپے","pkr","kitne ki","kitni ki"])) return "price";
+  if(hasLearnAny(t,["competitor","alternative","substitute","compare","comparison","versus","better","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valtec"])) return "competitor";
+  if(hasLearnAny(t,["missed dose","miss dose","dose miss","bhool","بھول"])) return "missed_dose";
+  if(hasLearnAny(t,["side effect","side effects","سائیڈ ایفیکٹ","نقصان"])) return "side_effects";
+  if(hasLearnAny(t,["chakkar","dizziness","dizzy","swelling","soojan","سوجن","headache","سر درد"]) && hasLearnAny(t,["mujhe","مجھے","having","feel","feeling","ho raha","ہو رہا","what should","kya kar"])) return "side_effect_help";
+  if(hasLearnAny(t,["panadol","paracetamol","ibuprofen","brufen","other medicine","another medicine","koi aur dawa","ساتھ کون سی دوا","interaction"])) return "other_medicines";
+  if(hasLearnAny(t,["stop extor","stop taking","band kar","بند کر","چھوڑ دوں"])) return "stopping";
+  if(hasLearnAny(t,["co extor","co-extor","کو ایکسٹور"])) return "co_extor";
+  if(hasLearnAny(t,["overdose","too many tablets","extra tablets","زیادہ گولیاں"])) return "overdose";
+  if(hasLearnAny(t,["chest pain","سینے میں درد","difficulty breathing","سانس","faint","بے ہوش"])) return "emergency";
+  if(hasLearnAny(t,["5/80","5 80","5/160","5 160","10/160","10 160","strength","power","variation","طاقت"])) return "strengths";
+  if(hasLearnAny(t,["with food","without food","empty stomach","khane","کھانے","خالی پیٹ"])) return "food";
+  if(hasLearnAny(t,["what time","when should","kab","کس وقت","کب لوں","morning","evening","night"])) return "timing";
+  if(hasLearnAny(t,["how to take","how should i take","kaise loon","کیسے لوں","water","pani","پانی","milk","doodh","دودھ"])) return "how_to_take";
+  if(hasLearnAny(t,["what is extor","extor kya hai","ایکسٹور کیا ہے","used for","kis liye","کس لیے"])) return "what_is";
+  if(proposed && proposed!=="other_extor") return proposed;
+  return "other_extor";
+}
+function isDuplicateLearningEvent(callId,text,intent,source){
+  const key=[String(callId||""),learningText(text),String(intent||""),String(source||"")].join("|"); const now=Date.now(),prev=recentLearningEvents.get(key)||0; recentLearningEvents.set(key,now);
+  if(recentLearningEvents.size>500){ for(const [k,ts] of recentLearningEvents) if(now-ts>60000) recentLearningEvents.delete(k); }
+  return !!prev && (now-prev)<LEARN_DEDUPE_WINDOW_MS;
+}
+function addLearnedPhrase(intent,text){
+  intent=normalizeIntentName(intent); const normalized=learningText(text); if(!intent||normalized.length<3)return;
+  try{ const learned=JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE,"utf8")||"{}"); learned[intent]=Array.isArray(learned[intent])?learned[intent]:[]; if(!learned[intent].includes(normalized)){ learned[intent].push(normalized); learned[intent]=learned[intent].slice(-250); fs.writeFileSync(LEARNED_PHRASES_FILE,JSON.stringify(learned,null,2)); } }catch(e){}
+}
+
 app.post("/api/learn", (req, res) => {
   const evt = req.body || {};
   const safe = {
     ts: new Date().toISOString(),
     callId: String(evt.callId || ""),
     text: String(evt.text || "").slice(0, 500),
-    intent: evt.intent ? String(evt.intent).slice(0, 80) : null,
+    intent: inferLearningIntent(evt.text, evt.intent ? String(evt.intent).slice(0, 80) : null),
     matched: !!evt.matched,
     usedClaude: !!evt.usedClaude,
     latencyMs: Number.isFinite(evt.latencyMs) ? evt.latencyMs : null,
     source: String(evt.source || (evt.usedClaude ? "CLAUDE" : "BUILT_IN")).slice(0, 40)
   };
-  try { fs.appendFileSync(LEARNING_LOG, JSON.stringify(safe) + "\n"); } catch (e) {}
+  const duplicate = isDuplicateLearningEvent(safe.callId, safe.text, safe.intent, safe.source);
+  if (!duplicate) { try { fs.appendFileSync(LEARNING_LOG, JSON.stringify(safe) + "\n"); } catch (e) {} }
+  else console.log(`[learning-dedupe] skipped duplicate intent=${safe.intent} source=${safe.source}`);
 
   // Human-readable source flag for live training/debugging in Terminal.
   // CLAUDE_REQUEST is routing-only; CLAUDE_RESPONSE is the actual spoken reply.
@@ -121,20 +169,11 @@ app.post("/api/learn", (req, res) => {
   // Auto-learn ONLY wording for an already-approved Extor intent. Never learn
   // a new medical fact, off-topic classification, dose, or response from a caller.
   const APPROVED_LEARN_INTENTS = new Set([
-    "what_is","strengths","side_effects","side_effect_help","side_effect_medicine","other_medicines","missed_dose","how_to_take","timing",
-    "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase"
+    "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine","other_medicines","missed_dose","how_to_take","timing",
+    "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase","price","competitor"
   ]);
   if (safe.matched && APPROVED_LEARN_INTENTS.has(safe.intent) && safe.text.length >= 3) {
-    try {
-      const learned = JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE, "utf8") || "{}");
-      learned[safe.intent] = Array.isArray(learned[safe.intent]) ? learned[safe.intent] : [];
-      const normalized = safe.text.toLowerCase().replace(/\s+/g, " ").trim();
-      if (!learned[safe.intent].includes(normalized)) {
-        learned[safe.intent].push(normalized);
-        learned[safe.intent] = learned[safe.intent].slice(-250);
-        fs.writeFileSync(LEARNED_PHRASES_FILE, JSON.stringify(learned, null, 2));
-      }
-    } catch (e) {}
+    addLearnedPhrase(safe.intent, safe.text);
   }
   res.json({ ok: true });
 });
@@ -151,9 +190,9 @@ function normalizeLearnText(value) {
 // and only for a small approved set of general Extor intents.
 app.post("/api/learn-answer", (req, res) => {
   const body = req.body || {};
-  const allowed = new Set(["what_is", "strengths", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "other_extor"]);
-  const intent = String(body.intent || "");
+  const allowed = new Set(["what_is", "strengths", "dose_frequency", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "price", "competitor", "purchase", "other_extor"]);
   const question = normalizeLearnText(body.question).slice(0, 500);
+  const intent = inferLearningIntent(question, body.intent);
   const answer = String(body.answer || "").replace(/<state>[\s\S]*?<\/state>/g, "").trim().slice(0, 700);
   if (!allowed.has(intent) || question.length < 5 || answer.length < 8) return res.status(400).json({ok:false});
   // Do not persist clearly patient-specific numeric advice. Vitals can still be
@@ -170,7 +209,9 @@ app.post("/api/learn-answer", (req, res) => {
     rows.push(row);
     rows = rows.slice(-400);
     fs.writeFileSync(LEARNED_ANSWERS_FILE, JSON.stringify(rows, null, 2));
-    return res.json({ok:true});
+    addLearnedPhrase(intent, question);
+    console.log(`[learning-promote] intent=${intent} question="${question.slice(0,120)}"`);
+    return res.json({ok:true, intent});
   } catch (e) {
     return res.status(500).json({ok:false,error:e.message});
   }
@@ -197,7 +238,13 @@ app.get("/api/learning-summary", (req, res) => {
     const lines = fs.readFileSync(LEARNING_LOG, "utf8").trim().split("\n").filter(Boolean).slice(-50);
     recent = lines.map(x => { try { return JSON.parse(x); } catch (e) { return null; } }).filter(Boolean).reverse();
   } catch (e) {}
-  res.json({ ok: true, learnedPhraseCounts: Object.fromEntries(Object.entries(learned).map(([k,v]) => [k, Array.isArray(v) ? v.length : 0])), recent });
+  let answers = [];
+  try { answers = JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE, "utf8") || "[]"); } catch (e) {}
+  if (!Array.isArray(answers)) answers = [];
+  const learnedAnswerCounts = {};
+  for (const row of answers) { const k=String(row && row.intent || "unknown"); learnedAnswerCounts[k]=(learnedAnswerCounts[k]||0)+1; }
+  const quality = { learnedAnswers:answers.length, learnedPhrases:Object.values(learned).reduce((n,v)=>n+(Array.isArray(v)?v.length:0),0), recentClaudeFallbacks:recent.filter(x=>x&&x.usedClaude).length, recentLearnedDbHits:recent.filter(x=>x&&String(x.source||"").includes("LEARNED_DB")).length, recentUnknown:recent.filter(x=>x&&(x.intent==="unknown_extor"||x.intent==="other_extor")).length };
+  res.json({ ok: true, learnedPhraseCounts: Object.fromEntries(Object.entries(learned).map(([k,v]) => [k, Array.isArray(v) ? v.length : 0])), learnedAnswerCounts, quality, recent });
 });
 
 app.post("/api/chat", async (req, res) => {
