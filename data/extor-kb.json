@@ -1,0 +1,120 @@
+{
+  "version": "1.6",
+  "scope": "Extor only",
+  "brand": "Extor",
+  "company": "The Searle Company Limited",
+  "generic": "Amlodipine + Valsartan",
+  "rx": true,
+  "strengths": [
+    "5mg/80mg",
+    "5mg/160mg",
+    "10mg/160mg"
+  ],
+  "approved_answers": {
+    "what_is": "ایکسٹور ہائی بلڈ پریشر کی دوا ہے، جس میں ایملوڈیپین اور والسارٹن شامل ہیں۔",
+    "strengths": "ایکسٹور کی تین طاقتیں ہیں: 5/80 میں ایملوڈیپین 5 اور والسارٹن 80، 5/160 میں والسارٹن 160، اور 10/160 میں ایملوڈیپین 10 ملی گرام ہوتا ہے؛ طاقت کا انتخاب بلڈ پریشر کے کنٹرول اور برداشت کے مطابق ڈاکٹر کرتا ہے، کسی ایک مقررہ BP نمبر سے نہیں۔",
+    "side_effects": "عام سائیڈ ایفیکٹس میں چکر، سر درد، کمزوری اور ٹخنوں کی سوجن شامل ہو سکتی ہے۔",
+    "missed_dose": "خوراک بھول جائیں تو یاد آنے پر لیں، مگر اگلی خوراک قریب ہو تو دگنی خوراک نہ لیں۔",
+    "pregnancy": "حمل میں ایکسٹور استعمال نہیں کرنی چاہیے؛ فوراً اپنے ڈاکٹر سے مشورہ کریں۔",
+    "stopping": "ایکسٹور خود سے بند نہ کریں؛ بلڈ پریشر نارمل ہونا دوا کے کام کرنے کی علامت ہو سکتا ہے۔",
+    "how_to_take": "ایکسٹور ڈاکٹر کے نسخے کے مطابق روزانہ تقریباً ایک ہی وقت پر، کھانے کے ساتھ یا بغیر لی جا سکتی ہے۔",
+    "timing": "ایکسٹور روزانہ تقریباً ایک ہی وقت پر لیں؛ صبح یا شام وہی وقت رکھیں جو ڈاکٹر نے بتایا ہو۔",
+    "food": "ایکسٹور کھانے کے ساتھ یا بغیر کھانے کے لی جا سکتی ہے؛ اسے پانی کے ساتھ نگلیں۔",
+    "co_extor": "ایکسٹور میں ایملوڈیپین اور والسارٹن ہیں، جبکہ کو-ایکسٹور میں ہائیڈروکلوروتھائیزائڈ بھی شامل ہے۔",
+    "overdose": "زیادہ خوراک لینے کی صورت میں فوری طبی مدد لیں اور گھر پر خود علاج کی کوشش نہ کریں۔",
+    "emergency": "سانس میں دشواری یا چہرے، ہونٹوں یا گلے کی سوجن ہو تو فوری ایمرجنسی مدد لیں۔",
+    "side_effect_help_general": "اگر کوئی سائیڈ ایفیکٹ ہو رہا ہے تو علامت بتا دیجیے؛ میں اسی کے مطابق مختصر رہنمائی دوں گی۔",
+    "side_effect_headache": "ہلکے سر درد میں آرام اور پانی مفید ہو سکتا ہے؛ پیراسیٹامول بعض بالغ افراد میں مناسب ہوتا ہے، مگر جگر کی بیماری یا الرجی ہو تو پہلے ڈاکٹر یا فارماسسٹ سے پوچھیں۔",
+    "side_effect_dizziness": "چکر ہوں تو بیٹھ یا لیٹ جائیں، پانی پئیں اور بلڈ پریشر چیک کریں؛ بےہوشی، سینے کے درد یا شدید کمزوری میں فوری طبی مدد لیں۔",
+    "side_effect_swelling": "ٹخنوں یا پاؤں کی سوجن میں خود سے پیشاب آور دوا شروع نہ کریں؛ اپنے ڈاکٹر سے ایکسٹور کی خوراک یا علاج کا جائزہ کروائیں۔",
+    "side_effect_medicine": "جی، کچھ ہلکے سائیڈ ایفیکٹس کے لیے دوسری دوا استعمال کی جا سکتی ہے؛ مثلاً ہلکے سر درد میں پیراسیٹامول بعض بالغ افراد کے لیے مناسب ہو سکتا ہے۔ لیکن چکر، سوجن، متلی یا دوسرے سائیڈ ایفیکٹس کے لیے کون سی دوا مناسب ہے، یہ ڈاکٹر یا فارماسسٹ سے کنفرم کرنا ضروری ہے، اس لیے ایکسٹور کے ساتھ خود سے نئی دوا شروع نہ کریں۔",
+    "other_medicines": "ایکسٹور کے ساتھ دوسری دوائیں لی جا سکتی ہیں، لیکن یہ دوا پر منحصر ہے؛ کوئی نئی دوا، خاص طور پر آئبوپروفین، ڈائیکلوفیناک، پوٹاشیم سپلیمنٹ یا پیشاب آور دوا، ڈاکٹر یا فارماسسٹ سے کنفرم کیے بغیر شروع نہ کریں۔",
+    "strength_5_80": "ایکسٹور 5/80 میں ایملوڈیپین 5 اور والسارٹن 80 ملی گرام ہے؛ یہ کم والسارٹن والی کمبینیشن آپشن ہے، اور اسے کب استعمال کرنا ہے یہ ڈاکٹر آپ کے BP کنٹرول اور برداشت کے مطابق طے کرتا ہے۔",
+    "strength_5_160": "ایکسٹور 5/160 میں ایملوڈیپین 5 اور والسارٹن 160 ملی گرام ہے؛ سیئرل کی معلومات کے مطابق اسے ایسے بالغ مریضوں میں استعمال کیا جا سکتا ہے جن کا BP ایملوڈیپین 5 یا والسارٹن 160 اکیلے سے مناسب کنٹرول نہ ہو۔",
+    "strength_10_160": "ایکسٹور 10/160 میں ایملوڈیپین 10 اور والسارٹن 160 ملی گرام ہے؛ یہ 5/160 کے مقابلے میں زیادہ ایملوڈیپین والی آپشن ہے، جسے ڈاکٹر زیادہ BP کنٹرول کی ضرورت اور برداشت کے مطابق منتخب کرتا ہے۔",
+    "price": "موجودہ آن لائن ریفرنس کے مطابق 14 گولیوں کے پیک کی قیمت تقریباً 5/80 کے لیے 467 سے 492، 5/160 کے لیے 584 سے 615، اور 10/160 کے لیے 665 سے 700 روپے ہے؛ موجودہ فارمیسی قیمت کنفرم کر لیجیے۔",
+    "competitor": "ایکسٹور کے متبادل برانڈز میں Exforge، Avsar، Amlortan، Amstan، Dioplus، Newday اور Valam شامل ہیں؛ ایکسٹور تین طاقتوں میں سیئرل کی ایملوڈیپین پلس والسارٹن آپشن ہے اور کئی متبادل کے مقابلے میں قیمت بھی مسابقتی ہے، مگر برانڈ تبدیلی ڈاکٹر یا فارماسسٹ سے کریں۔"
+  },
+  "learning_policy": {
+    "auto_learn": [
+      "caller wording",
+      "roman urdu variants",
+      "known intent phrase variants"
+    ],
+    "never_auto_learn": [
+      "dose",
+      "strength selection",
+      "new side effects",
+      "contraindications",
+      "medical facts",
+      "doctor instructions"
+    ]
+  },
+  "conversation_policy": {
+    "opening": "Ask caller name first, then ask whether they have a doctor prescription for Extor.",
+    "no_prescription": "Explain that Extor is a prescription medicine and advise consulting a doctor to obtain a prescription. Do not proceed to personalized use instructions without it.",
+    "after_no_prescription_referral": "Continue answering general Extor questions naturally; do not keep repeating the prescription or scope warning.",
+    "scope": "Treat reasonable medicine-related follow-ups as part of the Extor conversation even when the caller does not repeat the word Extor. Block only clearly unrelated topics.",
+    "style": "Natural one-line telephone conversation with one question at a time.",
+    "after_verified_prescription": "Ask the caller their usual blood-pressure reading once; never use it to change prescribed dose or strength.",
+    "fallback": "Unusual but plausible Extor questions go to the Extor-only Claude fallback. If Claude maps the question to an approved intent, learn only the caller wording for faster future matching.",
+    "verified_prescription_flow": "After successful prescription verification, ask weight, then ask usual BP once. Whether BP is known or unknown, proceed to ask what the caller wants to know about Extor medicine.",
+    "post_bp_prompt": "اب بتائیے، آپ ایکسٹور میڈیسن کے بارے میں کیا جاننا چاہتے ہیں؟"
+  },
+  "strength_guidance": {
+    "principle": "Extor strengths are titration options for essential hypertension. There is no fixed blood-pressure number that automatically determines a strength; the prescriber chooses based on current BP control, prior amlodipine/valsartan treatment, response, tolerability and clinical context.",
+    "5mg/80mg": {
+      "composition": "Amlodipine 5 mg + Valsartan 80 mg",
+      "role": "Lower-valsartan combination option within the Extor range. A clinician may use it when both components are appropriate but a lower valsartan component is preferred.",
+      "patient_rule": "Do not tell a caller that a specific BP reading means they should use 5/80; strength selection is prescriber-only."
+    },
+    "5mg/160mg": {
+      "composition": "Amlodipine 5 mg + Valsartan 160 mg",
+      "role": "Higher valsartan component while amlodipine remains 5 mg. Searle prescribing information states it may be used when BP is not adequately controlled with amlodipine 5 mg or valsartan 160 mg alone.",
+      "patient_rule": "Do not recommend switching from 5/80 to 5/160 without the prescriber."
+    },
+    "10mg/160mg": {
+      "composition": "Amlodipine 10 mg + Valsartan 160 mg",
+      "role": "Higher amlodipine component than 5/160. It is a higher-intensity combination option that a clinician may select when additional BP lowering is needed and the patient can tolerate the higher amlodipine dose.",
+      "patient_rule": "Do not present it as automatically appropriate for a particular BP threshold."
+    }
+  },
+  "commercial_guidance": {
+    "price_reference_date": "2026-08-25",
+    "pack_size": "14 tablets",
+    "prices_pkr": {
+      "5/80": {
+        "low": 467,
+        "high": 492
+      },
+      "5/160": {
+        "low": 584,
+        "high": 615
+      },
+      "10/160": {
+        "low": 665,
+        "high": 700
+      }
+    },
+    "price_policy": "Prices are dated market references and can change by pharmacy. Always say approximately/current reference and advise confirming the latest pharmacy price.",
+    "competitor_examples": [
+      "Exforge",
+      "Avsar",
+      "Amlortan",
+      "Amstan",
+      "Dioplus",
+      "Newday",
+      "Valam",
+      "Valsar-M",
+      "Valtan M",
+      "Valtec AM"
+    ],
+    "comparison_policy": "Compare ingredients, strengths, manufacturer, pack size and price. Do not claim universal clinical superiority or recommend switching without doctor/pharmacist guidance.",
+    "extor_value_points": [
+      "Amlodipine + Valsartan combination",
+      "Three available strengths: 5/80, 5/160 and 10/160 mg",
+      "Searle brand",
+      "Competitively priced versus many listed alternatives"
+    ]
+  }
+}

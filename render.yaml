@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: searle-voice-agent
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SONIOX_API_KEY
+        sync: false
+      - key: UPLIFT_API_KEY
+        sync: false
+      - key: TTS_PROVIDER
+        value: uplift
+      - key: UPLIFT_TTS_VOICE
+        value: paediatrician
+      - key: ENABLE_SONIOX_TTS_FALLBACK
+        value: "1"

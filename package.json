@@ -1,0 +1,17 @@
+{
+  "name": "searle-extor-fast-voice-agent",
+  "version": "1.0.0",
+  "description": "Low-latency Extor-only Urdu voice assistant for Searle Pharmacy.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

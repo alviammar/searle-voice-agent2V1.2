@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Searle Pharmacy — Voice Assistant</title>
+<style>
+  :root{
+    --bg:#F4F8FD;
+    --bg-2:#EAF1FB;
+    --panel:rgba(255,255,255,0.88);
+    --panel-2:#FFFFFF;
+    --ink:#0F2340;
+    --ink-soft:#1C355A;
+    --muted:#61738F;
+    --muted-2:#8292AA;
+    --accent:#5D8ABD;
+    --accent-deep:#3F6EA6;
+    --accent-soft:rgba(93,138,189,0.14);
+    --green:#58B98A;
+    --green-deep:#2F9365;
+    --line:rgba(93,138,189,0.18);
+    --shadow:0 32px 80px rgba(41,76,126,0.16);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:
+      radial-gradient(900px 520px at 10% 0%, rgba(93,138,189,0.14), transparent 60%),
+      radial-gradient(900px 520px at 90% 100%, rgba(88,185,138,0.10), transparent 58%),
+      linear-gradient(180deg, #FAFCFF 0%, var(--bg) 50%, var(--bg-2) 100%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Nastaliq Urdu","Jameel Noori Nastaliq","Urdu Typesetting",sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:24px 14px;
+  }
+  .call-card{
+    width:100%;
+    max-width:470px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,251,255,0.90) 68%, rgba(244,248,253,0.95));
+    border:1px solid rgba(255,255,255,0.7);
+    border-radius:30px;
+    padding:30px 24px 26px;
+    position:relative;
+    overflow:hidden;
+    min-height:640px;
+    display:flex;
+    flex-direction:column;
+    box-shadow:var(--shadow);
+    backdrop-filter:blur(16px);
+  }
+  .call-card::before{
+    content:"";
+    position:absolute; inset:0;
+    background:
+      radial-gradient(420px 180px at 50% 0%, rgba(93,138,189,0.11), transparent 72%),
+      radial-gradient(320px 180px at 90% 92%, rgba(88,185,138,0.09), transparent 70%);
+    pointer-events:none;
+  }
+  .brand-row{
+    display:flex; align-items:center; justify-content:space-between;
+    direction:ltr; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    gap:14px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand-logo-wrap{
+    width:44px; height:44px; border-radius:14px; background:rgba(255,255,255,0.9);
+    border:1px solid rgba(93,138,189,0.14); box-shadow:0 12px 26px rgba(93,138,189,0.12);
+    display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  }
+  .brand-logo{ width:30px; height:auto; display:block; }
+  .brand-text{ min-width:0; }
+  .brand-name{font-size:14px; letter-spacing:.2px; color:var(--ink); font-weight:700;}
+  .brand-sub{font-size:11px; color:var(--muted); margin-top:2px;}
+  .call-status{
+    font-size:11.5px; color:var(--muted); letter-spacing:.2px; white-space:nowrap;
+    background:rgba(255,255,255,0.62); border:1px solid var(--line); border-radius:999px;
+    padding:8px 12px;
+  }
+  .call-status.live{color:var(--green-deep);}
+  .call-status.live::before{content:"● "; }
+
+  .avatar-zone{
+    flex:1;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px;
+  }
+  .avatar{
+    width:158px;height:158px;border-radius:50%;
+    background:radial-gradient(circle at 30% 26%, #FFFFFF, #EEF4FC 55%, #DFEAF8 100%);
+    border:1px solid rgba(93,138,189,0.16);
+    display:flex;align-items:center;justify-content:center;
+    font-size:56px;
+    position:relative;
+    box-shadow:0 18px 42px rgba(93,138,189,0.14);
+  }
+  .avatar::after{
+    content:""; position:absolute; inset:16px; border-radius:50%;
+    border:1px dashed rgba(93,138,189,0.15);
+  }
+  .avatar .ring{
+    position:absolute; inset:-11px; border-radius:50%;
+    border:1.5px solid rgba(93,138,189,0.34);
+    opacity:0;
+  }
+  .avatar.speaking .ring{ animation:pulse 1.4s ease-out infinite; opacity:1; }
+  .avatar.listening .ring{ border-color:rgba(88,185,138,0.55); animation:pulse 1s ease-out infinite; opacity:1;}
+  @keyframes pulse{
+    0%{ transform:scale(0.92); opacity:.6; }
+    100%{ transform:scale(1.42); opacity:0; }
+  }
+  .agent-name{font-size:19px; color:var(--ink); font-weight:700;}
+  .agent-role{font-size:12.5px; color:var(--muted);}
+  .wave-canvas{ width:240px; height:48px; display:block; }
+  .live-caption{
+    font-size:13px; color:var(--ink-soft); min-height:18px;
+    max-width:330px; text-align:center; direction:rtl; line-height:1.8;
+  }
+
+  .controls{
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    padding-top:18px; border-top:1px dashed var(--line);
+  }
+  .mic-indicator{
+    width:76px;height:76px;border-radius:50%;
+    border:none; cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));
+    color:#fff; font-size:26px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 16px 32px rgba(93,138,189,0.24);
+    transition:transform .15s ease, box-shadow .2s ease;
+  }
+  .mic-indicator:active{ transform:scale(0.94); }
+  .mic-indicator.listening{ background:linear-gradient(135deg,#7FD8AC,var(--green)); box-shadow:0 16px 32px rgba(88,185,138,0.24);}
+  .mic-indicator:disabled{ opacity:.45; cursor:not-allowed; }
+  .mic-hint{ font-size:11px; color:var(--muted-2); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; direction:rtl;}
+  .secondary-row{ display:flex; gap:10px; margin-top:2px; }
+  .chip-btn{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    direction:ltr; font-size:11.5px; color:var(--ink-soft);
+    background:rgba(255,255,255,0.82);
+    border:1px solid var(--line); border-radius:22px;
+    padding:9px 16px; cursor:pointer;
+    box-shadow:0 8px 18px rgba(93,138,189,0.08);
+  }
+  .chip-btn:hover{ background:rgba(255,255,255,0.98); }
+
+  .call-again-btn{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    margin-top:4px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));
+    color:#fff; border:none; border-radius:14px;
+    padding:13px 24px; font-size:14px; font-weight:700; cursor:pointer;
+    display:none;
+    box-shadow:0 12px 26px rgba(93,138,189,0.22);
+  }
+
+  .start-overlay{
+    position:absolute; inset:0; border-radius:30px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,250,255,0.96));
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; text-align:center; padding:30px; z-index:5;
+    backdrop-filter:blur(10px);
+  }
+  .qr-box{
+    width:100px;height:100px;border-radius:18px;
+    background:
+      repeating-linear-gradient(90deg, #0F2340 0 6px, #fff 6px 12px) center/60% 60% no-repeat,
+      repeating-linear-gradient(0deg, #0F2340 0 6px, transparent 6px 12px);
+    background-color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#0F2340; font-weight:700;
+    box-shadow:0 16px 34px rgba(93,138,189,0.12);
+    border:1px solid rgba(93,138,189,0.12);
+  }
+  .start-title{font-size:17px; color:var(--ink); font-weight:700; max-width:300px;}
+  .start-sub{font-size:12.5px; color:var(--muted); max-width:290px; line-height:1.8;}
+  .start-btn{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    margin-top:6px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));
+    color:#fff; border:none; border-radius:14px;
+    padding:12px 28px; font-size:14px; font-weight:700; cursor:pointer;
+    box-shadow:0 12px 30px rgba(93,138,189,0.24);
+  }
+  .support-note{ font-size:11px; color:var(--muted-2); direction:ltr; max-width:300px; line-height:1.6;}
+
+  .camera-overlay{
+    position:absolute; inset:0; border-radius:30px;
+    background:rgba(248,251,255,0.96);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; padding:20px; z-index:10;
+    backdrop-filter:blur(8px);
+  }
+  .camera-overlay.active{ display:flex; }
+  .camera-prompt-title{ font-size:15px; color:var(--ink); text-align:center; max-width:300px; }
+  #cameraVideo{
+    width:100%; max-width:320px; aspect-ratio:3/4; object-fit:cover;
+    border-radius:18px; background:#DDE7F5; border:1px solid var(--line);
+    box-shadow:0 14px 34px rgba(93,138,189,0.14);
+  }
+  .capture-btn{
+    width:68px;height:68px;border-radius:50%;
+    background:#fff; border:4px solid var(--accent);
+    cursor:pointer; box-shadow:0 12px 28px rgba(93,138,189,0.18);
+  }
+  .camera-cancel{
+    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+    font-size:12px; color:var(--muted); background:none; border:none; cursor:pointer;
+    direction:ltr;
+  }
+
+  .status-flash{
+    position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    direction:ltr; font-size:11px; color:var(--ink-soft);
+    background:rgba(255,255,255,0.94); border:1px solid var(--line);
+    box-shadow:0 14px 34px rgba(93,138,189,0.12);
+    border-radius:12px; padding:8px 14px; max-width:90%;
+    text-align:center; opacity:0; transition:opacity .3s ease;
+    pointer-events:none;
+  }
+  .status-flash.show{ opacity:1; }
+
+  .debug-toggle{
+    position:absolute; top:14px; left:14px; width:28px; height:28px;
+    border-radius:10px; background:rgba(255,255,255,0.78); border:1px solid var(--line);
+    color:var(--muted); font-size:13px; cursor:pointer; z-index:6;
+    box-shadow:0 8px 18px rgba(93,138,189,0.10);
+  }
+  .debug-panel{
+    display:none;
+    background:#FFFFFF; color:var(--ink); border-radius:14px;
+    border:1px solid var(--line);
+    padding:14px 16px; margin-top:14px; font-size:12px;
+    font-family:-apple-system,BlinkMacSystemFont,sans-serif; direction:ltr;
+    max-height:160px; overflow-y:auto;
+    box-shadow:0 16px 34px rgba(93,138,189,0.10);
+  }
+  .debug-panel.show{ display:block; }
+  .debug-panel .row{ display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px dashed rgba(93,138,189,0.18); }
+
+  .dev-badge{
+    position:absolute;
+    right:16px;
+    top:106px;
+    width:92px;
+    background:rgba(255,255,255,0.90);
+    border:1px solid rgba(93,138,189,0.16);
+    border-radius:18px;
+    padding:10px 8px;
+    box-shadow:0 14px 28px rgba(93,138,189,0.10);
+    text-align:center;
+    direction:ltr;
+    z-index:3;
+    backdrop-filter:blur(8px);
+  }
+  .dev-badge-title{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:10px;
+    line-height:1.35;
+    color:var(--muted);
+    margin-bottom:8px;
+    letter-spacing:.15px;
+  }
+  .dev-badge img{
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:10px;
+  }
+  @media (max-width: 520px){
+    .dev-badge{
+      width:82px;
+      right:12px;
+      top:112px;
+      padding:8px 7px;
+    }
+    .dev-badge-title{ font-size:9px; margin-bottom:6px; }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="call-card" id="callCard">
+  <button class="debug-toggle" id="debugToggle" title="debug view">⚙</button>
+
+  <div class="brand-row">
+    <div class="brand">
+      <div class="brand-logo-wrap"><img src="searle-logo.png" alt="Searle" class="brand-logo"></div>
+      <div class="brand-text">
+        <div class="brand-name">Searle Pharmacy</div>
+        <div class="brand-sub">Smart voice care assistant</div>
+      </div>
+    </div>
+    <div class="call-status" id="callStatus">Scan → Call not started</div>
+  </div>
+
+  <div class="dev-badge">
+    <div class="dev-badge-title">Developed by</div>
+    <img src="disrupt-logo.jpg" alt="The Disrupt Labs">
+  </div>
+
+  <div class="avatar-zone">
+    <div class="avatar" id="avatar"><div class="ring"></div><span id="avatarEmoji">🎧</span></div>
+    <canvas id="waveCanvas" width="240" height="48" class="wave-canvas"></canvas>
+    <div class="agent-name">ثانیہ</div>
+    <div class="agent-role">سیئرل فارمیسی معاون</div>
+    <div class="live-caption" id="liveCaption"></div>
+  </div>
+
+  <div id="debugPanel" class="debug-panel"></div>
+
+  <div class="controls">
+    <button class="mic-indicator" id="micBtn" disabled>🎙️</button>
+    <div class="mic-hint" id="micHint">automatic — just talk</div>
+    <div class="secondary-row">
+      <button class="chip-btn" id="endBtn">☎ end call</button>
+    </div>
+    <button class="call-again-btn" id="callAgainBtn">🔁 دوبارہ کال کریں</button>
+  </div>
+
+  <div class="start-overlay" id="startOverlay">
+    <div class="qr-box">QR</div>
+    <div class="start-title">کسٹمر نے QR کوڈ اسکین کیا</div>
+    <div class="start-sub">ڈیمو میں کال شروع کرنے کے لیے نیچے دبائیں۔ اصلی سیٹ اپ میں یہ مرحلہ QR اسکین کے بعد خودکار ہو سکتا ہے۔</div>
+    <button class="start-btn" id="startBtn">کال شروع کریں</button>
+    <div class="support-note">Clicking this will ask for mic + camera permission — allow both, or the call can't hear you / take photos.</div>
+  </div>
+
+  <div class="camera-overlay" id="cameraOverlay">
+    <div class="camera-prompt-title">براہِ کرم اپنا نسخہ کیمرے کے سامنے رکھیں</div>
+    <video id="cameraVideo" autoplay playsinline muted></video>
+    <button class="capture-btn" id="captureBtn" title="Take photo"></button>
+    <button class="camera-cancel" id="cameraCancelBtn">Cancel</button>
+  </div>
+
+  <div class="status-flash" id="statusFlash"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const BACKEND_ORIGIN = String(window.SEARLE_BACKEND_URL || "").replace(/\/$/, "");
+function apiUrl(path){ return BACKEND_ORIGIN ? BACKEND_ORIGIN + path : path; }
+function backendWsUrl(path){
+  if (!BACKEND_ORIGIN){
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${location.host}${path}`;
+  }
+  const u = new URL(BACKEND_ORIGIN);
+  const proto = u.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${u.host}${path}`;
+}
+
+/* =========================================================
+   DUMMY DATA — replace all of this with real business data
+   ========================================================= */
+
+const STORES = [
+  { id:"clifton", name_ur:"شاخ — کلفٹن", name_en:"Clifton Branch" },
+  { id:"gulshan", name_ur:"شاخ — گلشنِ اقبال", name_en:"Gulshan-e-Iqbal Branch" },
+  { id:"defence", name_ur:"شاخ — ڈیفنس", name_en:"Defence Branch" }
+];
+
+const CATALOG = [
+  { id:"panadol", name_ur:"پیناڈول (Paracetamol 500mg)", symptoms:["بخار","سر درد","جسم درد","fever","headache"], dose_ur:"بالغ افراد کے لیے: ہر 6 گھنٹے بعد 1 گولی، دن میں 4 بار سے زیادہ نہیں۔", rx:false, price:"Rs. 45 (10 گولیاں)", stock:{clifton:40,gulshan:5,defence:0} },
+  { id:"brufen", name_ur:"بروفن (Ibuprofen 400mg)", symptoms:["جسم درد","سوجن","درد","body pain","inflammation"], dose_ur:"کھانے کے بعد، ہر 8 گھنٹے بعد 1 گولی۔ خالی پیٹ نہ لیں۔", rx:false, price:"Rs. 60 (10 گولیاں)", stock:{clifton:22,gulshan:18,defence:9} },
+  { id:"disprin", name_ur:"ڈسپرین (Aspirin 300mg)", symptoms:["سر درد","بخار","headache"], dose_ur:"1 گولی پانی میں حل کر کے، دن میں 3 بار تک۔ 16 سال سے کم عمر کو نہ دیں۔", rx:false, price:"Rs. 20 (10 گولیاں)", stock:{clifton:15,gulshan:0,defence:12} },
+  { id:"flagyl", name_ur:"فلیجل (Metronidazole)", symptoms:["پیٹ کا انفیکشن","اسہال","diarrhea"], dose_ur:"صرف ڈاکٹر کے نسخے پر۔", rx:true, price:"Rs. 85 (14 گولیاں)", stock:{clifton:10,gulshan:14,defence:6} },
+  { id:"augmentin", name_ur:"اگمنٹن (Amoxicillin+Clavulanate)", symptoms:["گلے کا انفیکشن","بخار کے ساتھ انفیکشن","infection"], dose_ur:"صرف ڈاکٹر کے نسخے پر — اینٹی بائیوٹک ہے۔", rx:true, price:"Rs. 320 (14 گولیاں)", stock:{clifton:8,gulshan:3,defence:11} },
+  { id:"ors", name_ur:"او آر ایس (ORS)", symptoms:["اسہال","ڈی ہائیڈریشن","diarrhea","dehydration"], dose_ur:"1 پیکٹ 1 لیٹر صاف پانی میں حل کریں، دن بھر تھوڑا تھوڑا پیئیں۔", rx:false, price:"Rs. 25 فی پیکٹ", stock:{clifton:60,gulshan:40,defence:33} },
+  { id:"imodium", name_ur:"امودیم (Loperamide)", symptoms:["اسہال","diarrhea"], dose_ur:"پہلی خوراک 2 کیپسول، پھر ہر دست کے بعد 1 کیپسول۔ 8 کیپسول سے زیادہ نہ لیں۔", rx:false, price:"Rs. 95 (6 کیپسول)", stock:{clifton:12,gulshan:0,defence:4} },
+  { id:"claritin", name_ur:"کلیریٹن (Loratadine)", symptoms:["الرجی","چھینکیں","خارش","allergy","sneezing"], dose_ur:"دن میں ایک بار 1 گولی۔", rx:false, price:"Rs. 110 (10 گولیاں)", stock:{clifton:19,gulshan:9,defence:0} },
+  { id:"gaviscon", name_ur:"گیویسکون", symptoms:["تیزابیت","بدہضمی","سینے میں جلن","acidity","heartburn"], dose_ur:"کھانے کے بعد اور سوتے وقت 10-20 ملی لیٹر۔", rx:false, price:"Rs. 380 (شربت)", stock:{clifton:14,gulshan:6,defence:20} },
+  { id:"strepsils", name_ur:"سٹریپسلز", symptoms:["گلے کی خراش","کھانسی","sore throat","cough"], dose_ur:"ہر 2-3 گھنٹے بعد 1 لوزنج چوسیں۔", rx:false, price:"Rs. 150 (24 لوزنج)", stock:{clifton:30,gulshan:22,defence:17} },
+  { id:"surbex", name_ur:"سربیکس-زیڈ (وٹامنز)", symptoms:["کمزوری","تھکاوٹ","weakness","fatigue"], dose_ur:"دن میں ایک بار کھانے کے بعد 1 کیپسول۔", rx:false, price:"Rs. 210 (30 کیپسول)", stock:{clifton:25,gulshan:25,defence:25} }
+];
+
+const DOCTORS = [
+  { name:"Dr. Asadullah Khan Soomro", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS, Dip. in Cardiology (London)", area:"کلفٹن", area_en:"Clifton", facility:"Altamash General Hospital", phone:"0302-2308718" },
+  { name:"Dr. Tariq Ishaq", title_ur:"ماہرِ امراضِ قلب، کنسلٹنٹ فزیشن", specialty_en:"Cardiologist, Consultant Physician", qualification:"MBBS, MRCP (Medicine), FRCP, Dip. in Cardiology", area:"ڈی ایچ اے", area_en:"DHA", facility:"Western Clinics / DHA Clinic Karachi / OMI Clinics DHA", phone:"021-38140600" },
+  { name:"Dr. Arsalan Younus", title_ur:"ماہرِ امراضِ قلب، جنرل فزیشن", specialty_en:"Cardiologist, General Physician", qualification:"MBBS, FCPS (Cardiology)", area:"گلشنِ اقبال", area_en:"Gulshan-e-Iqbal", facility:"Taj Consultants Clinics", phone:"021-38140600" },
+  { name:"Prof. Dr. Abdul Rasheed Khan", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS, FCPS, Dip. in Cardiology, MD (Cardiology)", area:"گلشنِ اقبال", area_en:"Gulshan-e-Iqbal", facility:"Karachi Medical Complex / Darul Sehat Hospital", phone:"021-38183435" },
+  { name:"Dr. Mumtaz Ali", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS, Dip. in Cardiology, MPH", area:"نارتھ ناظم آباد", area_en:"North Nazimabad", facility:"Sindh Rangers Hospital / Marium General Hospital", phone:"021-38140600" },
+  { name:"Dr. Najeeb Basir", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS, FRCP", area:"کلفٹن / ڈی ایچ اے", area_en:"Clifton / DHA", facility:"South City Hospital / Canada Medical Group Pakistan", phone:"021-38183435" },
+  { name:"Dr. Muhammad Sohail Zahid", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS, Diploma in Cardiology", area:"ایم اے جناح روڈ", area_en:"M.A. Jinnah Road", facility:"Jamiyat Sabbira Clinic & Diabetic Center", phone:"021-38183435" },
+  { name:"Dr. Shahid Khalil", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS", area:"کلفٹن / گلشنِ حدید", area_en:"Clifton / Gulshan-e-Hadeed", facility:"Cooper Consultants Clinic / Ayesha General Hospital", phone:"021-38183435" },
+  { name:"Dr. Riazuddin Shaikh", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"MBBS, Diploma in Cardiology", area:"ملیر", area_en:"Malir", facility:"Al-Khidmat Medical Centre Malir", phone:"021-38183435" },
+  { name:"Dr. Babar S. Hasan", title_ur:"ماہرِ امراضِ قلب", specialty_en:"Cardiologist", qualification:"Cardiology Consultant", area:"اسٹیڈیم روڈ", area_en:"Stadium Road", facility:"The Aga Khan University Hospital", phone:"021-38183435" }
+];
+
+// Real Karachi pharmacies for location-based referral. Extor stock is NOT live-verified.
+// Sania must always ask the caller to confirm Extor/strength availability by phone before visiting.
+const MEDICAL_STORES = [
+  { id:"clifton_pharmacy_services", name_ur:"دی فارمیسی سروسز", name_en:"The Pharmacy Services", area_ur:"کلفٹن / گزری", area_en:"Clifton / Gizri", address_ur:"شاپ 2، انڈیگو ٹاور، بلاک 9 گزری، کراچی", phone:"0300-0519823", extor_stock:"call_to_confirm" },
+  { id:"dha_pharmacy_point", name_ur:"فارمیسی پوائنٹ", name_en:"Pharmacy Point", area_ur:"ڈی ایچ اے فیز 6", area_en:"DHA Phase 6", address_ur:"شاپ 1، 11-E خیابانِ سحر، شہباز کمرشل، کراچی", phone:"021-35857887", extor_stock:"call_to_confirm" },
+  { id:"gulshan_vayani", name_ur:"ویانی میڈیکو", name_en:"Vayani Medico", area_ur:"گلشنِ اقبال", area_en:"Gulshan-e-Iqbal", address_ur:"بلاک 16، گلشنِ اقبال، کراچی", phone:"021-34990600", extor_stock:"call_to_confirm" },
+  { id:"north_nazimabad_dvago", name_ur:"ڈی ویگو فارمیسی", name_en:"DVAGO Pharmacy & Wellness Experts", area_ur:"نارتھ ناظم آباد", area_en:"North Nazimabad", address_ur:"سارہ انکلیو، بلاک H، نارتھ ناظم آباد، کراچی", phone:"021-111-138-246", extor_stock:"call_to_confirm" },
+  { id:"pechs_sooper", name_ur:"سوپر اینڈ سنز", name_en:"Sooper & Sons", area_ur:"پی ای سی ایچ ایس", area_en:"PECHS", address_ur:"185 ای مارکیٹ، بلاک 6، پی ای سی ایچ ایس، کراچی", phone:"021-34386152", extor_stock:"call_to_confirm" },
+  { id:"gulshan_dawa", name_ur:"دعویٰ ہیلتھ کیئر گلشن", name_en:"Dawa Healthcare Gulshan", area_ur:"گلشنِ اقبال", area_en:"Gulshan-e-Iqbal", address_ur:"پلاٹ GPC-1، بلاک 4، گلشنِ اقبال، کراچی", phone:"0331-4443292", extor_stock:"call_to_confirm" },
+  { id:"johar_dvago", name_ur:"ڈی ویگو فارمیسی منور چورنگی", name_en:"DVAGO Pharmacy - Munawar Chowrangi", area_ur:"گلستانِ جوہر", area_en:"Gulistan-e-Johar", address_ur:"کرم ٹاور، منور چورنگی، بلاک 12، گلستانِ جوہر، کراچی", phone:"021-111-138-246", extor_stock:"call_to_confirm" },
+  { id:"fba_tayyab", name_ur:"طیبز فارمیسی اینڈ باسکٹ", name_en:"Tayyab's Pharmacy & Basket", area_ur:"فیڈرل بی ایریا / کریم آباد", area_en:"Federal B Area / Karimabad", address_ur:"بلاک 3، کریم آباد، فیڈرل بی ایریا، کراچی", phone:"0311-4322578", extor_stock:"call_to_confirm" },
+  { id:"saddar_shiraz", name_ur:"شیراز میڈیکل اینڈ جنرل اسٹور", name_en:"Shiraz Medical and General Store", area_ur:"صدر", area_en:"Saddar", address_ur:"فرید سنٹر، ڈپو لائنز، سینٹ پیٹرک اسٹریٹ، صدر، کراچی", phone:"0300-2826806", extor_stock:"call_to_confirm" },
+  { id:"malir_medical", name_ur:"ملیر میڈیکل اسٹور", name_en:"Malir Medical Store", area_ur:"ملیر", area_en:"Malir", address_ur:"شاہراہِ فیصل، ملیر کالونی، کراچی", phone:null, extor_stock:"call_to_confirm" }
+];
+
+const RED_FLAGS = [
+  "سینے میں شدید درد","سانس لینے میں دشواری","بے ہوشی","شدید خون بہنا",
+  "فالج کی علامات","حمل میں شدید تکلیف","تین ماہ سے کم عمر بچے میں بخار",
+  "شدید الرجک ردعمل","خودکشی کے خیالات",
+  "ہونٹوں یا چہرے کی سوجن","زبان یا گلے کی سوجن","نگلنے میں دشواری"
+];
+
+const SYMPTOM_COMBOS = [
+  { combo:["بخار","گردن اکڑنا"], note:"ممکنہ گردن توڑ بخار — فوری ڈاکٹر کے پاس بھیجیں" },
+  { combo:["سینے میں درد","سانس میں دشواری"], note:"ممکنہ دل کا مسئلہ — فوری ڈاکٹر کے پاس بھیجیں" },
+  { combo:["پیٹ درد","قے","دائیں نچلے پیٹ میں درد"], note:"ممکنہ اپینڈکس — عام درد کی دوا نہ دیں، ڈاکٹر بھیجیں" },
+  { combo:["اسہال","خون"], note:"خونی اسہال میں صرف او آر ایس کافی نہیں — ڈاکٹر دکھائیں" },
+  { combo:["بخار","تین ماہ سے کم عمر"], note:"شیر خوار بچے میں کوئی بھی بخار سنگین سمجھیں" },
+  { combo:["سر درد","بخار","الٹی"], note:"سادہ سر درد سے مختلف امکان — دورانیہ اور شدت مزید پوچھیں، شک ہو تو ڈاکٹر بھیجیں" }
+];
+
+const DRUG_INFO = [
+  {
+    id: "extor",
+    brand_en: "Extor",
+    brand_ur: "ایکسٹور",
+    company: "The Searle Company Limited",
+    generic: "Amlodipine + Valsartan",
+    rx: true,
+    category_ur: "بلند فشار خون کی دوا (اینٹی ہائپرٹینسیو)",
+    indication_ur: "بالغ افراد میں ہائی بلڈ پریشر (ہائپرٹینشن) کے علاج کے لیے — خاص طور پر جب اکیلے Amlodipine یا اکیلے Valsartan سے بلڈ پریشر کنٹرول نہ ہو رہا ہو",
+    strengths: ["5mg/80mg", "5mg/160mg", "10mg/160mg"],
+    strength_guidance_ur: {
+      "5/80": "ایملوڈیپین 5mg + والسارٹن 80mg؛ کم والسارٹن والی کمبینیشن آپشن، ڈاکٹر BP کنٹرول اور برداشت کے مطابق منتخب کرتا ہے۔",
+      "5/160": "ایملوڈیپین 5mg + والسارٹن 160mg؛ سیئرل SPC کے مطابق ایسے بالغ مریضوں میں استعمال ہو سکتی ہے جن کا BP ایملوڈیپین 5mg یا والسارٹن 160mg اکیلے سے مناسب کنٹرول نہ ہو۔",
+      "10/160": "ایملوڈیپین 10mg + والسارٹن 160mg؛ 5/160 کے مقابلے میں زیادہ ایملوڈیپین والی آپشن، زیادہ BP کنٹرول کی ضرورت اور برداشت کے مطابق ڈاکٹر منتخب کرتا ہے۔"
+    },
+    strength_selection_rule_ur: "کسی ایک BP نمبر کے لیے کوئی طاقت خودکار طور پر مقرر نہیں؛ ڈاکٹر موجودہ BP، پچھلی دوا، علاج کے جواب اور سائیڈ ایفیکٹس/برداشت کے مطابق طاقت منتخب کرتا ہے۔",
+    usual_dose_ur: "عام طور پر دن میں ایک گولی — لیکن آپ کے لیے کونسی طاقت (strength) درست ہے یہ صرف ڈاکٹر طے کرتا ہے، خود سے طاقت تبدیل نہ کریں",
+    how_to_take_ur: "کھانے کے ساتھ یا بغیر کھانے کے لی جا سکتی ہے، پانی کے ساتھ نگلیں، روزانہ تقریباً ایک ہی وقت پر",
+    common_side_effects_ur: ["سر درد","چکر آنا","تھکاوٹ/کمزوری","پیروں یا ٹخنوں میں سوجن","گرمی کا احساس/چہرہ سرخ ہونا","متلی","پیٹ میں تکلیف","قبض یا اسہال","دھڑکن"],
+    precautions_ur: [
+      "حمل کے دوران شروع نہ کی جائے — اگر حمل ہو جائے تو فوراً ڈاکٹر سے رجوع کریں",
+      "دودھ پلانے کے دوران عام طور پر تجویز نہیں کی جاتی — ڈاکٹر سے مشورہ کریں",
+      "شدید جگر یا گردے کے مسائل میں احتیاط اور ڈاکٹری نگرانی ضروری",
+      "پوٹاشیم سپلیمنٹس یا پوٹاشیم بڑھانے والی ادویات کے ساتھ احتیاط، بلڈ ٹیسٹ کی ضرورت ہو سکتی ہے",
+      "18 سال سے کم عمر بچوں میں تجویز نہیں کی جاتی"
+    ],
+    missed_dose_ur: "اگر خوراک بھول جائیں تو یاد آتے ہی لے لیں، لیکن اگر اگلی خوراک کا وقت قریب ہو تو بھولی ہوئی خوراک چھوڑ دیں — کبھی دگنی خوراک نہ لیں",
+    overdose_ur: "زیادہ خوراک لینے کی صورت میں گھر پر علاج کرنے کی کوشش نہ کریں — فوری ایمرجنسی سروس یا ڈاکٹر سے رابطہ کریں، خاص طور پر اگر شدید چکر، کمزوری یا بے ہوشی محسوس ہو",
+    stopping_ur: "بلڈ پریشر نارمل ہو جانے پر بھی خود سے دوا بند نہ کریں — نارمل ریڈنگ کا مطلب ہو سکتا ہے کہ دوا کام کر رہی ہے۔ بند کرنے یا خوراک بدلنے سے پہلے ڈاکٹر سے ضرور مشورہ کریں",
+    vs_co_extor_ur: "ایکسٹور میں صرف Amlodipine اور Valsartan ہوتے ہیں۔ کو-ایکسٹور (Co-Extor) میں ان دونوں کے ساتھ ایک تیسری دوا Hydrochlorothiazide بھی شامل ہے — یہ دونوں مختلف دوائیں ہیں، ایک دوسرے کی جگہ استعمال نہ کریں",
+    emergency_symptoms_ur: ["ہونٹوں کی سوجن","چہرے کی سوجن","زبان یا گلے کی سوجن","سانس لینے میں دشواری","نگلنے میں دشواری"],
+    never_do: [
+      "مریض کے لیے طاقت (strength) کا انتخاب نہ کریں",
+      "خوراک خود سے نہ بڑھائیں نہ کم کریں",
+      "کسی دوسری دوا کی جگہ ایکسٹور تجویز نہ کریں",
+      "حمل میں استعمال کی توثیق نہ کریں",
+      "کسی بیماری کی تشخیص نہ کریں یا نئی دوا شروع کرنے کا مشورہ نہ دیں"
+    ],
+    disclaimer_ur: "یہ معلومات عمومی رہنمائی کے لیے ہیں اور آپ کے ڈاکٹر یا فارماسسٹ کے مشورے کا متبادل نہیں۔ ایکسٹور ایک تجویز شدہ دوا ہے، اس کی خوراک یا طاقت ڈاکٹر کے مشورے کے بغیر تبدیل نہ کریں۔"
+  }
+];
+
+
+// --------------------------------------------------------------------------
+// APPROVED COMMERCIAL KNOWLEDGE — dated market references, not clinical claims.
+// Prices can change; callers should confirm the current pharmacy price.
+// --------------------------------------------------------------------------
+const EXTOR_COMMERCIAL_INFO = {
+  price_reference_date: "2026-08-25",
+  pack_size: "14 tablets",
+  prices_pkr: {
+    "5/80": { low: 467, high: 492 },
+    "5/160": { low: 584, high: 615 },
+    "10/160": { low: 665, high: 700 }
+  },
+  alternatives: ["Exforge","Avsar","Amlortan","Amstan","Dioplus","Newday","Valam","Valsar-M","Valtan M","Valtec AM"],
+  value_points_ur: [
+    "ایملوڈیپین اور والسارٹن ایک ہی گولی میں",
+    "تین دستیاب طاقتیں: 5/80، 5/160 اور 10/160 ملی گرام",
+    "سیئرل کا برانڈ",
+    "کئی لسٹڈ متبادل برانڈز کے مقابلے میں مسابقتی قیمت"
+  ],
+  safe_comparison_ur: "ایکسٹور کے متبادل برانڈز میں Exforge، Avsar، Amlortan، Amstan، Dioplus، Newday اور Valam شامل ہیں؛ ایکسٹور ایملوڈیپین اور والسارٹن کی تین طاقتوں میں سیئرل کی برانڈڈ آپشن ہے اور کئی متبادل کے مقابلے میں قیمت بھی مسابقتی ہے، مگر برانڈ تبدیل کرنے کا فیصلہ ڈاکٹر یا فارماسسٹ سے کریں۔"
+};
+
+/* =========================================================
+   SYSTEM PROMPT — the agent's brain / conversation logic
+   ========================================================= */
+function buildSystemPrompt(){
+  return `You are "ثانیہ" (Sania), Searle Pharmacy's Extor-only live telephone assistant.
+
+STRICT SCOPE:
+- The entire call is an Extor conversation. Discuss ANY meaningful Extor-related question naturally: what it is, why it is prescribed, timing, food, missed dose, side effects, precautions, strengths, blood pressure context, prescription, availability, price, competitor/alternative comparisons, stopping, overdose, Co-Extor, and reasonable follow-ups about taking or understanding Extor.
+- Do NOT require the caller to repeat the word "Extor" on every turn. Pronouns and follow-ups such as "کب لینی ہے؟", "کھانے کے ساتھ؟", "اگر بھول جاؤں؟" are part of the same Extor conversation.
+- Only block clearly unrelated topics such as other diseases/medicines, skin/hair treatment, sports, weather, politics, general trivia, etc. Redirect once, briefly, then continue normally when the caller returns to Extor.
+- Never keep repeating the scope warning when the caller is asking a reasonable medicine-related follow-up.
+
+LANGUAGE UNDERSTANDING:
+- The caller may speak Urdu, Roman Urdu, English, or another language. Understand the meaning from the full current utterance; never require a fixed phrase or word order.
+- During name capture, extract the person's name from a natural introduction in any language if it is reasonably clear. Do not treat greetings as the name.
+- For medicine questions, infer intent from multiple clues together (topic + requested action + Extor/conversation context). If clues are weak, classify as other_extor rather than guessing a specific fast answer.
+
+VOICE STYLE:
+- Urdu script only, respectful "آپ".
+- Sound like a natural human female pharmacy representative on a real phone call: warm, quick, conversational.
+- Give EXACTLY ONE COMPLETE spoken sentence for normal answers, ideally 12-24 spoken words.
+- Never continue an answer in a second speaking phase and never add an afterthought after the sentence.
+- If a safety warning is needed, include it in the SAME sentence using a semicolon.
+- Ask at most one short follow-up question, and only when it is necessary to move the conversation forward.
+- Never produce a paragraph, list, or multi-sentence explanation.
+- Ask only ONE question at a time.
+- Use the caller's name naturally after it is known, but do not repeat it every turn.
+- No lectures, no lists, no robotic disclaimers unless safety requires them.
+
+CALL FLOW + PRESCRIPTION RULE:
+- Opening onboarding is STRICT and simple: caller name -> Extor prescription status -> if YES, visually verify the prescription -> ask weight -> ask usual blood pressure -> then ask what the caller wants to know about Extor.
+- If they say they have a prescription, ask to see it and set request_photo:true. prescription_status="verified" only if the image clearly names Extor. After successful verification, acknowledge it briefly and ask for weight. After weight, ask usual BP. After BP (or if BP is unknown), ask: what would you like to know about Extor?
+- If they do NOT have an Extor prescription, DO NOT ask weight, BP, area, pharmacy, or doctor location. Say briefly that Extor is prescription-only and they should consult a doctor and obtain a prescription before Sania can give patient-specific instructions; then wait for them to return with a prescription.
+- Never carry an old question forward through onboarding. Finish onboarding first, then ask what they want to know and answer the fresh question they ask next.
+- After a verified prescription, answer ONLY the caller's CURRENT Extor question directly and sensibly. Never volunteer an unrelated topic, never continue an old question, and never guess from one keyword.
+- Treat every general Extor utterance as a fresh question. Do not auto-answer a pending topic from an earlier turn. If the current full utterance is ambiguous, ask one short clarification instead of guessing.
+- Extor is prescription-only. Never tell the caller to start, stop, change, select, or increase a dose/strength without verified prescription and doctor guidance.
+- Weight and BP are context only. Never use them to calculate or change the Extor dose.
+- BP classification is informational only, not a diagnosis. A reading around or above 180/120, especially with chest pain, breathing difficulty, confusion, weakness, or severe symptoms, requires urgent medical assessment.
+- No normal Extor intent may skip the onboarding sequence.
+- Never select/change dose or strength.
+- Strength explanation rule: explain the COMPONENT DIFFERENCE and general titration role, but never map a strength to a fixed BP threshold.
+- 5/80 = amlodipine 5 mg + valsartan 80 mg, the lower-valsartan option in the Extor range.
+- 5/160 = amlodipine 5 mg + valsartan 160 mg; Searle prescribing information states this may be used when BP is not adequately controlled on amlodipine 5 mg or valsartan 160 mg alone.
+- 10/160 = amlodipine 10 mg + valsartan 160 mg, a higher-amlodipine option than 5/160; a clinician may select it when additional BP lowering is needed and tolerated.
+- If asked "which strength is for me?" or gives a BP reading, do NOT choose one; say the doctor selects strength based on BP control, previous therapy, response and tolerability.
+
+APPROVED EXTOR KNOWLEDGE:
+${JSON.stringify(DRUG_INFO)}
+
+APPROVED EXTOR COMMERCIAL KNOWLEDGE:
+${JSON.stringify(EXTOR_COMMERCIAL_INFO)}
+- Prices are dated market references and may change by pharmacy; always say approximately/current reference and advise confirming the current price.
+- If asked why Extor is "better", do NOT claim universal clinical superiority. Give factual differentiation only: amlodipine + valsartan in one tablet, three strengths, Searle brand, and competitive listed pricing.
+- Competitor/alternative names are for comparison only; never tell a caller to switch brands without their prescriber/pharmacist.
+
+KARACHI DOCTORS — use only these:
+${JSON.stringify(DOCTORS)}
+
+KARACHI PHARMACIES — Extor stock is NOT live verified; tell callers to confirm exact strength before visiting:
+${JSON.stringify(MEDICAL_STORES)}
+
+LEARNING INTENT LABELS:
+- For the hidden state, use the single intent that BEST matches the caller's actual question: what_is, strengths, dose_frequency, side_effects, side_effect_help, side_effect_medicine, other_medicines, missed_dose, how_to_take, timing, food, pregnancy, breastfeeding, kidney_liver, potassium, under18, stopping, co_extor, overdose, emergency, price, competitor, purchase, or other_extor.
+- Before choosing an intent, interpret the COMPLETE current utterance. A built-in intent is allowed only when at least TWO independent clues are explicitly present in the caller's CURRENT sentence (normally topic + requested action). Existing call context alone never counts as a second clue. If the full meaning is uncertain, use other_extor and answer the exact question instead of guessing.
+- Answer ONLY the exact CURRENT question asked. Do not answer a previous question, a likely next question, or an unasked topic such as how to take the medicine.
+- Do not introduce doctor/location/purchase flows unless the current onboarding state or the caller's actual question requires them.
+- If the current utterance has conflicting clues, prefer the strongest 2-3 agreeing clues; if no intent has enough evidence, use other_extor and answer the literal question instead of guessing.
+- This label is used only to learn how real callers phrase Extor questions; never create new medical facts from caller wording.
+
+OUTPUT: spoken Urdu first, then exactly one hidden state block:
+<state>{"name":"<caller name or null>","intent":"what_is|strengths|dose_frequency|side_effects|side_effect_help|side_effect_medicine|other_medicines|missed_dose|how_to_take|timing|food|pregnancy|breastfeeding|kidney_liver|potassium|under18|stopping|co_extor|overdose|emergency|price|competitor|purchase|other_extor","mode":"medicine"|"purchase"|null,"symptoms":[],"prescription_status":"unknown"|"yes_unverified"|"verified"|"none","prescription_medicine":"Extor"|null,"area":"<area or null>","weight_kg":"<caller stated weight in kg or null>","usual_bp":"<caller stated usual BP or null>","purchase_intent":true|false,"requested_strength":"<strength or null>","followup_stage":null,"escalation":false,"suggested_specialty":null,"tone":"normal"|"empathetic","request_photo":true|false,"closing":false}</state>`;
+}
+
+/* =========================================================
+   APP STATE
+   ========================================================= */
+let messages = [];
+let callActive = false;
+let micStream = null; // kept alive for the whole call now — raw audio streamed to Soniox STT
+let urduVoice = null;
+let callId = null; // unique per phone call — lets the server reuse ONE Soniox connection for the whole call
+
+
+// --------------------------------------------------------------------------
+// EXTOR FAST PATH — most calls never need Claude.
+// This state machine uses only approved answers below. It can learn new caller
+// PHRASES for known intents, but never learns/changes medical facts by itself.
+// --------------------------------------------------------------------------
+const FAST_EXTOR_ANSWERS = {
+  what_is: "ایکسٹور ہائی بلڈ پریشر کی دوا ہے، جس میں ایملوڈیپین اور والسارٹن شامل ہیں۔",
+  strengths: "ایکسٹور کی تین طاقتیں ہیں: 5/80 میں ایملوڈیپین 5 اور والسارٹن 80، 5/160 میں والسارٹن 160، اور 10/160 میں ایملوڈیپین 10 ملی گرام ہوتا ہے؛ طاقت کا انتخاب BP کنٹرول اور برداشت کے مطابق ڈاکٹر کرتا ہے، کسی مقررہ BP نمبر سے نہیں۔",
+  strength_5_80: "ایکسٹور 5/80 میں ایملوڈیپین 5 اور والسارٹن 80 ملی گرام ہے؛ یہ کم والسارٹن والی کمبینیشن آپشن ہے، اور اسے کب استعمال کرنا ہے یہ ڈاکٹر BP کنٹرول اور برداشت کے مطابق طے کرتا ہے۔",
+  strength_5_160: "ایکسٹور 5/160 میں ایملوڈیپین 5 اور والسارٹن 160 ملی گرام ہے؛ سیئرل کی معلومات کے مطابق یہ ایسے بالغ مریضوں میں استعمال ہو سکتی ہے جن کا BP ایملوڈیپین 5 یا والسارٹن 160 اکیلے سے مناسب کنٹرول نہ ہو۔",
+  strength_10_160: "ایکسٹور 10/160 میں ایملوڈیپین 10 اور والسارٹن 160 ملی گرام ہے؛ یہ 5/160 کے مقابلے میں زیادہ ایملوڈیپین والی آپشن ہے، جسے ڈاکٹر زیادہ BP کنٹرول کی ضرورت اور برداشت کے مطابق منتخب کرتا ہے۔",
+  dose_frequency: "ایکسٹور عام طور پر روزانہ ایک بار لی جاتی ہے؛ ایک دن میں دو گولیاں صرف اسی صورت میں لیں جب آپ کے ڈاکٹر کے نسخے میں واضح طور پر ایسا لکھا ہو، ورنہ خوراک خود سے نہ بڑھائیں۔",
+  side_effects: "عام سائیڈ ایفیکٹس میں چکر، سر درد، کمزوری اور ٹخنوں کی سوجن شامل ہو سکتی ہے۔",
+  side_effect_help_general: "اگر کوئی سائیڈ ایفیکٹ ہو رہا ہے تو علامت بتا دیجیے؛ میں اسی کے مطابق مختصر رہنمائی دوں گی۔",
+  side_effect_headache: "ہلکے سر درد میں آرام اور پانی مددگار ہیں؛ پیراسیٹامول بعض بالغ افراد لے سکتے ہیں، مگر پہلے ڈاکٹر یا فارماسسٹ سے کنفرم کریں۔",
+  side_effect_dizziness: "چکر ہوں تو بیٹھ یا لیٹ جائیں، پانی پئیں اور بلڈ پریشر چیک کریں؛ بےہوشی، سینے کے درد یا شدید کمزوری میں فوری طبی مدد لیں۔",
+  side_effect_swelling: "ٹخنوں یا پاؤں کی سوجن میں خود سے پیشاب آور دوا شروع نہ کریں؛ اپنے ڈاکٹر سے ایکسٹور کی خوراک یا علاج کا جائزہ کروائیں۔",
+  side_effect_weakness: "کمزوری ہو تو بلڈ پریشر چیک کریں، پانی پئیں اور آرام کریں؛ بہت کم بلڈ پریشر، بےہوشی یا شدید کمزوری میں فوراً ڈاکٹر سے رابطہ کریں۔",
+  side_effect_nausea: "متلی میں پانی اور ہلکی غذا لیں؛ متلی کی دوا خود سے شامل کرنے کے بجائے ڈاکٹر یا فارماسسٹ سے مناسب دوا کنفرم کریں۔",
+  side_effect_palpitations: "دھڑکن تیز ہو تو آرام کریں اور بلڈ پریشر چیک کریں؛ سینے کے درد، سانس کی دشواری یا بےہوشی کے ساتھ ہو تو فوری طبی مدد لیں۔",
+  side_effect_medicine: "جی، ہلکے سر درد میں پیراسیٹامول بعض بالغ افراد لے سکتے ہیں؛ باقی سائیڈ ایفیکٹس کے لیے نئی دوا پہلے ڈاکٹر یا فارماسسٹ سے کنفرم کریں۔",
+  other_medicines: "کچھ دوائیں ایکسٹور کے ساتھ لی جا سکتی ہیں؛ آئبوپروفین، ڈائیکلوفیناک، پوٹاشیم یا پیشاب آور دوا پہلے ڈاکٹر سے کنفرم کریں۔",
+  side_effect_medicine_followup: "جی، اگر آپ علامت بتا دیں تو میں عمومی طور پر بتا سکتی ہوں کیا کیا جا سکتا ہے، لیکن نئی دوا شروع کرنے سے پہلے ڈاکٹر یا فارماسسٹ سے کنفرم کرنا ضروری ہے۔",
+  missed_dose: "خوراک بھول جائیں تو یاد آنے پر لیں، مگر اگلی خوراک قریب ہو تو دگنی خوراک نہ لیں۔",
+  how_to_take: "ایکسٹور کی گولی پانی کے ساتھ پوری نگلیں، اور ڈاکٹر کے نسخے کے مطابق روزانہ تقریباً ایک ہی وقت پر لیں۔",
+  timing: "ایکسٹور روزانہ تقریباً ایک ہی وقت پر لیں؛ صبح یا شام وہی وقت رکھیں جو ڈاکٹر نے بتایا ہو۔",
+  food: "ایکسٹور کھانے کے ساتھ یا بغیر کھانے کے لی جا سکتی ہے؛ اسے پانی کے ساتھ نگلیں۔",
+  pregnancy: "حمل میں ایکسٹور استعمال نہیں کرنی چاہیے؛ فوراً اپنے ڈاکٹر سے مشورہ کریں۔",
+  breastfeeding: "دودھ پلانے کے دوران ایکسٹور کے بارے میں اپنے ڈاکٹر سے مشورہ کریں؛ خود سے استعمال شروع نہ کریں۔",
+  kidney_liver: "گردے یا جگر کے مسئلے میں ایکسٹور ڈاکٹر کی نگرانی میں لینی چاہیے؛ اپنی خوراک خود تبدیل نہ کریں۔",
+  potassium: "پوٹاشیم سپلیمنٹ یا پوٹاشیم بڑھانے والی دوا کے ساتھ ایکسٹور لینے سے پہلے ڈاکٹر سے مشورہ کریں۔",
+  under18: "ایکسٹور عام طور پر 18 سال سے کم عمر افراد کے لیے تجویز نہیں کی جاتی؛ ڈاکٹر سے مشورہ کریں۔",
+  stopping: "ایکسٹور خود سے بند نہ کریں؛ بلڈ پریشر نارمل ہونا دوا کے کام کرنے کی علامت ہو سکتا ہے۔",
+  co_extor: "ایکسٹور میں ایملوڈیپین اور والسارٹن ہیں، جبکہ کو-ایکسٹور میں ہائیڈروکلوروتھائیزائڈ بھی شامل ہے۔",
+  overdose: "زیادہ خوراک لینے کی صورت میں فوری طبی مدد لیں اور گھر پر خود علاج کی کوشش نہ کریں۔",
+  emergency: "سانس میں دشواری یا چہرے، ہونٹوں یا گلے کی سوجن ہو تو فوری ایمرجنسی مدد لیں۔",
+  price: "موجودہ آن لائن ریفرنس کے مطابق 14 گولیوں کے پیک کی قیمت تقریباً 5/80 کے لیے 467 سے 492، 5/160 کے لیے 584 سے 615، اور 10/160 کے لیے 665 سے 700 روپے ہے؛ موجودہ فارمیسی قیمت کنفرم کر لیجیے۔",
+  competitor: "ایکسٹور کے متبادل برانڈز میں Exforge، Avsar، Amlortan، Amstan، Dioplus، Newday اور Valam شامل ہیں؛ ایکسٹور تین طاقتوں میں سیئرل کی ایملوڈیپین پلس والسارٹن آپشن ہے اور کئی متبادل کے مقابلے میں قیمت بھی مسابقتی ہے، مگر برانڈ تبدیلی ڈاکٹر یا فارماسسٹ سے کریں۔",
+  off_topic: "معذرت، میں اس کال میں صرف ایکسٹور سے متعلق رہنمائی کر سکتی ہوں؛ ایکسٹور کے بارے میں پوچھیے۔",
+  ask_name: "السلام علیکم، سیئرل فارمیسی سے ثانیہ بات کر رہی ہوں؛ آپ کا نام کیا ہے؟",
+  greeting_ack_name: "وعلیکم السلام، جی ضرور؛ آپ اپنا نام بتا دیجیے۔",
+  ask_help: "شکریہ؛ کیا آپ کے پاس ڈاکٹر کا ایکسٹور کا نسخہ موجود ہے؟",
+  ask_prescription: "جی، کیا آپ کے پاس ڈاکٹر کا ایکسٹور کا نسخہ موجود ہے؟",
+  ask_photo: "ٹھیک ہے، براہِ کرم اپنا ایکسٹور کا نسخہ کیمرے کے سامنے دکھا دیجیے۔",
+  prescription_verified_help: "شکریہ، نسخہ تصدیق ہو گیا ہے؛ اب بتائیے آپ ایکسٹور کے بارے میں کیا جاننا چاہتے ہیں؟",
+  ask_weight: "شکریہ؛ آپ کا وزن تقریباً کتنے کلو ہے؟",
+  ask_bp: "ٹھیک ہے؛ آپ کا بلڈ پریشر عموماً کتنا رہتا ہے، مثلاً ایک سو بیس بائی اسی؟",
+  weight_unknown_ack: "کوئی مسئلہ نہیں؛ وزن چیک کر لینا بہتر ہے، اور اگر معلوم ہو تو اب اپنا بلڈ پریشر بتا دیجیے۔",
+  bp_unknown_ack: "کوئی مسئلہ نہیں؛ بلڈ پریشر چیک کر لینا بہتر ہے۔",
+  ask_extor_question: "اب بتائیے، آپ ایکسٹور میڈیسن کے بارے میں کیا جاننا چاہتے ہیں؟",
+  bp_ack: "ٹھیک ہے، شکریہ؛ اب بتائیے، آپ ایکسٹور میڈیسن کے بارے میں کیا جاننا چاہتے ہیں؟",
+  no_prescription_stop: "ایکسٹور نسخے والی دوا ہے؛ براہِ کرم ڈاکٹر سے مشورہ کر کے نسخہ حاصل کریں، اس کے بغیر میں ذاتی استعمال یا خوراک کی ہدایات نہیں دے سکتی۔",
+  ask_store_area: "آپ کس علاقے میں ہیں تاکہ میں قریب کی فارمیسی بتا سکوں؟"
+};
+
+let learnedIntentPhrases = {};
+let learnedAnswerCache = [];
+
+async function refreshLearnedIntentPhrases(){
+  try{
+    const [pr, ar] = await Promise.all([
+      fetch(apiUrl("/api/learned-phrases")),
+      fetch(apiUrl("/api/learned-answers"))
+    ]);
+    const pd = await pr.json();
+    const ad = await ar.json();
+    learnedIntentPhrases = (pd && pd.learned) || {};
+    learnedAnswerCache = (ad && Array.isArray(ad.answers)) ? ad.answers : [];
+  }catch(e){ learnedIntentPhrases = {}; learnedAnswerCache = []; }
+}
+
+let fastState = {
+  name: null,
+  prescription: "unknown", // unknown | yes_unverified | verified | none
+  awaiting: "name",       // name | prescription | prescription_blocked | store_area
+  pendingIntent: null,
+  purchase: false,
+  area: null,
+  weightKg: null,
+  usualBp: null,
+  bpCategory: null,
+  afterVitals: null,       // purchase | null
+  onboardingComplete: false,
+  requestedStrength: null,
+  lastIntent: null,
+  lastSideEffect: null,
+  lastAnswerKey: null,
+  nameAttempts: 0,
+  weightAttempts: 0,
+  bpAttempts: 0,
+  sideEffectCounts: {},
+  lastLearnedAnswerId: null,
+  learnedHits: 0,
+  claudeLearnedThisCall: 0
+};
+
+function resetFastState(){
+  fastState = { name:null, prescription:"unknown", awaiting:"name", pendingIntent:null, purchase:false, area:null, weightKg:null, usualBp:null, bpCategory:null, afterVitals:null, onboardingComplete:false, requestedStrength:null, lastIntent:null, lastSideEffect:null, lastAnswerKey:null, nameAttempts:0, weightAttempts:0, bpAttempts:0, sideEffectCounts:{}, lastLearnedAnswerId:null, learnedHits:0, claudeLearnedThisCall:0 };
+}
+function normFast(s){
+  return String(s || "").toLowerCase().replace(/[؟?۔.,!]/g," ").replace(/\s+/g," ").trim();
+}
+function hasAnyFast(t, list){ return list.some(x => t.includes(x)); }
+function canonicalTokenFast(w){
+  const groups={
+    strength:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","ورائٹی"],
+    where:["where","kahan","کہاں"],
+    buy:["buy","purchase","pharmacy","store","خرید","فارمیسی"],
+    timing:["when","kab","time","timing","waqt","کب","وقت"],
+    food:["food","khana","khane","کھانا","کھانے"],
+    dose:["dose","dosage","خوراک"],
+    miss:["miss","missed","bhool","بھول"],
+    stop:["stop","stopping","band","بند","چھوڑ"],
+    dizzy:["dizzy","dizziness","chakkar","چکر"],
+    swelling:["swelling","soojan","sooj","سوجن"],
+    headache:["headache","سر","درد"],
+    sideeffect:["sideeffect","sideeffects","effect","effects","nuksan","nuqsan","نقصان"],
+    pregnancy:["pregnancy","pregnant","حمل","حاملہ"],
+    kidney:["kidney","renal","گردہ","گردے"],
+    liver:["liver","hepatic","جگر"]
+  };
+  for (const [canon,vals] of Object.entries(groups)) if (vals.includes(w)) return canon;
+  return w;
+}
+function tokenSetFast(s){
+  const stop=new Set(["extor","ایکسٹور","hai","ہے","kya","کیا","main","میں","mujhe","مجھے","a","an","the","is","are","to","of","for","me","my","meri","mera","ki","ka","ke"]);
+  return new Set(normFast(s).split(" ").filter(w => w.length > 1 && !stop.has(w)).map(canonicalTokenFast));
+}
+function similarityFast(a,b){
+  const A=tokenSetFast(a), B=tokenSetFast(b);
+  if (!A.size || !B.size) return 0;
+  let inter=0; for (const x of A) if (B.has(x)) inter++;
+  return inter / Math.max(A.size,B.size);
+}
+function meaningfulTokensFast(value){
+  const stop=new Set([
+    "extor","medicine","medicin","tablet","dawa","goli","ایکسٹور","دوا","گولی",
+    "kya","kia","hai","hain","he","hey","main","mein","mujhe","mera","meri","mere",
+    "what","is","are","the","a","an","i","me","my","can","could","would","do","does","with","for","of","to","it",
+    "کیا","ہے","ہیں","میں","مجھے","میرا","میری","میرے","کے","کی","کا","کو","سے","اور"
+  ]);
+  return new Set(normFast(value).split(/\s+/).map(canonicalTokenFast).filter(w=>w && w.length>1 && !stop.has(w)));
+}
+function learnedContentOverlapFast(a,b){
+  const A=meaningfulTokensFast(a), B=meaningfulTokensFast(b);
+  if (!A.size || !B.size) return 0;
+  let common=0; for (const x of A) if (B.has(x)) common++;
+  return common / Math.max(1, Math.min(A.size,B.size));
+}
+function findLearnedAnswerFast(rawText, intent){
+  let best=null, score=0, overlap=0;
+  for (const row of learnedAnswerCache || []){
+    if (!row || !row.question || !row.answer) continue;
+    if (intent && row.intent && row.intent !== intent && !(intent === "unknown_extor" && row.intent === "other_extor")) continue;
+    const s=similarityFast(rawText,row.question);
+    const ov=learnedContentOverlapFast(rawText,row.question);
+    const combined=(s*0.72)+(ov*0.28);
+    if (combined > score){ score=combined; best=row; overlap=ov; }
+  }
+  if (!best) return null;
+  const requestedIntent = intent === "unknown_extor" ? "other_extor" : intent;
+  const support = requestedIntent ? scoreIntentSignalsFast(normFast(rawText), requestedIntent).score : 0;
+  // Generic/other Extor answers are deliberately much stricter: these are the
+  // easiest answers to reuse incorrectly across different scenarios.
+  const generic = !requestedIntent || requestedIntent === "other_extor";
+  const ok = generic
+    ? (score >= 0.90 && overlap >= 0.66)
+    : ((score >= 0.86 && overlap >= 0.50) || (score >= 0.74 && overlap >= 0.66 && support >= 1));
+  if (!ok) return null;
+  console.log(`[learned-match] intent=${requestedIntent||"unknown"} confidence=${score.toFixed(2)} overlap=${overlap.toFixed(2)} support=${support}`);
+  return {...best, _score:score, _support:support, _overlap:overlap};
+}
+async function saveLearnedAnswerFast(question,intent,answer){
+  if (!question || !intent || !answer) return;
+  answer = compactSpokenReply(answer);
+  try{
+    const r=await fetch(apiUrl("/api/learn-answer"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question,intent,answer})});
+    if (r.ok){
+      learnedAnswerCache = (learnedAnswerCache || []).filter(x => !(x.intent===intent && normFast(x.question)===normFast(question)));
+      learnedAnswerCache.push({question:normFast(question),intent,answer});
+    }
+  }catch(e){}
+}
+function phraseBoundaryFast(t, phrases){
+  const s = ` ${normFast(t)} `;
+  return phrases.some(p => {
+    const q = normFast(p);
+    if (!q) return false;
+    // Space boundaries prevent bugs such as "no" matching "now" or "normal".
+    return s.includes(` ${q} `);
+  });
+}
+function isYesFast(t){
+  return phraseBoundaryFast(t,["yes","yeah","yep","haan","han","ji","jee","جی","ہاں"]) ||
+    hasAnyFast(normFast(t),["ہے میرے پاس","موجود ہے","prescription hai","نسخہ ہے","i have the prescription","i have prescription","yes i have","yes i do","yes i have it","i have it","i got it","mere paas prescription","mere paas hai","haan mere paas hai","han mere paas hai","جی میرے پاس ہے","ہاں میرے پاس ہے","میرے پاس نسخہ"]);
+}
+function isNoFast(t){
+  return phraseBoundaryFast(t,["no","nope","nahin","nahi","نہیں","نہی"]) ||
+    hasAnyFast(normFast(t),["نہیں ہے","نہیں موجود","prescription nahi","prescription nahin","نسخہ نہیں","i don't have the prescription","i dont have the prescription","i do not have the prescription","mere paas prescription nahi"]);
+}
+function prescriptionNowAvailableFast(t){
+  const s=normFast(t);
+  return isYesFast(s) || hasAnyFast(s,[
+    "found the prescription","found my prescription","i found the prescription","i found my prescription",
+    "got the prescription","got my prescription","i got the prescription","i have found it","i found it",
+    "prescription mil gaya","prescription mil gai","prescription mil gayi","prescription mil gya",
+    "mujhe prescription mil gaya","mujhe prescription mil gayi","ab prescription hai","ab mere paas hai",
+    "نسخہ مل گیا","نسخہ مل گئی","مجھے نسخہ مل گیا","اب نسخہ ہے","اب میرے پاس نسخہ ہے",
+    "doctor gave me the prescription","doctor gave prescription","received the prescription","prescription received"
+  ]);
+}
+function isGreetingAckFast(t){
+  const s=normFast(t);
+  return hasAnyFast(s,["walikum salam","walaikum salam","wa alaikum salam","وعلیکم السلام","وعليكم السلام","اسلام علیکم","assalam o alaikum","salam","سلام"]);
+}
+function isUnknownVitalFast(raw){
+  const t=normFast(raw);
+  return hasAnyFast(t,[
+    "i don't know","i dont know","don't know","dont know","not sure","no idea","i have no idea","i haven't checked","i havent checked","never checked","not checked",
+    "mujhe nahi pata","mujhe pata nahi","pata nahi","maloom nahi","maaloom nahi","check nahi kiya","check nahi kia","kabhi check nahi","yaad nahi","nahi maloom",
+    "مجھے نہیں پتا","پتا نہیں","معلوم نہیں","مجھے معلوم نہیں","چیک نہیں کیا","کبھی چیک نہیں کیا","یاد نہیں"
+  ]);
+}
+function mentionsExtorFast(t){
+  return hasAnyFast(t,["extor","اکسٹور","ایکسٹور","ایکسٹور","amlodipine","valsartan","5/80","5 80","5/160","5 160","10/160","10 160","co-extor","co extor","کو ایکسٹور"]);
+}
+function detectStrengthFast(t){
+  if (hasAnyFast(t,["10/160","10 160","10mg/160","دس ایک سو ساٹھ"])) return "10/160";
+  if (hasAnyFast(t,["5/160","5 160","5mg/160","پانچ ایک سو ساٹھ"])) return "5/160";
+  if (hasAnyFast(t,["5/80","5 80","5mg/80","پانچ اسی"])) return "5/80";
+  return null;
+}
+function strengthAnswerFast(text){
+  const st = detectStrengthFast(normFast(text));
+  if (st === "5/80") return FAST_EXTOR_ANSWERS.strength_5_80;
+  if (st === "5/160") return FAST_EXTOR_ANSWERS.strength_5_160;
+  if (st === "10/160") return FAST_EXTOR_ANSWERS.strength_10_160;
+  return FAST_EXTOR_ANSWERS.strengths;
+}
+function extractNameFast(raw){
+  let s = String(raw || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[؟?۔.!،,;؛:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return null;
+
+  // Natural callers often combine greeting + introduction in one sentence.
+  s = s
+    .replace(/^(?:(?:wa\s*)?alaikum\s+salam|walikum\s+salam|walaikum\s+salam|assalam(?:\s+o)?\s+alaikum|salam)\s*/i, "")
+    .replace(/^(?:وعلیکم\s+السلام|وعليكم\s+السلام|السلام\s+علیکم|سلام)\s*/u, "")
+    .replace(/^(?:جی|ji|jee|haan|han|yes|ہاں)\s+/i, "")
+    .trim();
+
+  // Search the whole utterance, not only a hard-coded beginning. This accepts
+  // e.g. "walikum salam mera naam Ammar hai", "I'm Ammar", "Ammar speaking",
+  // "this is Ammar", Urdu introductions, and similar natural word orders.
+  const patterns = [
+    /(?:my\s+name\s+is|name\s+is|mera\s+naam(?:\s+hai)?|mera\s+name(?:\s+hai)?|naam\s+mera(?:\s+hai)?)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}?)(?=\s+(?:hai|hey|he|hain|hoon|hun|here|speaking|aur|and)\b|$)/iu,
+    /(?:میرا\s+نام(?:\s+ہے)?|ميرا\s+نام(?:\s+ہے)?|نام\s+میرا(?:\s+ہے)?)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}?)(?=\s+(?:ہے|ہیں|ہوں|اور)\b|$)/u,
+    /(?:^|\s)(?:i\s*['’]?m|i\s+am|this\s+is|main|mein)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}?)(?=\s+(?:here|speaking|hoon|hun|ہوں|aur|and)\b|$)/iu,
+    /(?:^|\s)میں\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}?)\s+ہوں(?:\s|$)/u,
+    /(?:^|\s)([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}?)\s+(?:speaking|بول\s+رہا\s+ہوں|بول\s+رہی\s+ہوں)(?:\s|$)/iu
+  ];
+
+  let candidate = null;
+  for (const re of patterns){
+    const m=s.match(re);
+    if (m && m[1]) { candidate=m[1].trim(); break; }
+  }
+
+  // If the caller simply answers with their name, accept a short clean phrase.
+  if (!candidate){
+    const cleaned=s
+      .replace(/^(?:جی|ji|jee|haan|han|yes|ہاں)\s+/iu,'')
+      .replace(/\s+(?:ہے|ہیں|hai|hey|he|hain)$/iu,'')
+      .trim();
+    const words=cleaned.split(/\s+/).filter(Boolean);
+    const sentenceClues=/\b(?:prescription|extor|medicine|dawa|question|about|have|found|want|need|doctor|نسخہ|ایکسٹور|دوا|ڈاکٹر)\b/iu;
+    if (words.length >= 1 && words.length <= 3 && cleaned.length <= 40 && !sentenceClues.test(cleaned)) candidate=cleaned;
+  }
+
+  if (!candidate) return null;
+  candidate=candidate.replace(/\s+/g,' ').trim();
+  const words=candidate.split(' ').filter(Boolean);
+  const badWords=new Set(["naam","نام","mera","میرا","hai","ہے","hain","ہیں","prescription","نسخہ","extor","ایکسٹور","salam","سلام","walikum","walaikum","alaikum","وعلیکم","السلام","speaking","here"]);
+  if (!candidate || candidate.length > 40 || words.length > 3) return null;
+  if (words.some(w=>badWords.has(w.toLowerCase()))) return null;
+  return candidate;
+}
+function parseWeightFast(raw){
+  const text=String(raw||"").replace(/,/g,".");
+  const m=text.match(/(?:^|\s)(\d{2,3}(?:\.\d)?)\s*(?:kg|kgs|kilo|kilos|kilogram|کلو|کلوگرام)?(?:\s|$)/i);
+  if (!m) return null;
+  const n=parseFloat(m[1]);
+  return (n >= 25 && n <= 250) ? Math.round(n*10)/10 : null;
+}
+function parseBpFast(raw){
+  const s=String(raw||"").toLowerCase().replace(/,/g," ");
+  let m=s.match(/(\d{2,3})\s*(?:\/|over|by|پر|بائی)\s*(\d{2,3})/i);
+  if (!m) m=s.match(/(?:^|\s)(\d{2,3})\s+(\d{2,3})(?:\s|$)/);
+  if (!m) return null;
+  const sys=Number(m[1]), dia=Number(m[2]);
+  if (sys < 60 || sys > 260 || dia < 35 || dia > 160) return null;
+  return {sys,dia,raw:`${sys}/${dia}`};
+}
+function classifyBpFast(bp){
+  if (!bp) return {key:"unknown", ur:"یہ ریڈنگ واضح نہیں ہوئی"};
+  const {sys,dia}=bp;
+  if (sys >= 180 || dia >= 120) return {key:"very_high", ur:"یہ بلڈ پریشر بہت زیادہ ہے؛ اگر سینے میں درد، سانس کی دشواری یا شدید علامات ہوں تو فوری طبی مدد لیں"};
+  if (sys < 90 || dia < 60) return {key:"low", ur:"یہ بلڈ پریشر کم لگ رہا ہے"};
+  if (sys >= 130 || dia >= 80) return {key:"high", ur:"یہ بلڈ پریشر معمول سے زیادہ ہے"};
+  if (sys >= 120 && dia < 80) return {key:"elevated", ur:"یہ بلڈ پریشر معمول سے کچھ بلند ہے"};
+  return {key:"normal", ur:"یہ بلڈ پریشر عام حد میں ہے"};
+}
+function looksLikeBpFast(raw){ return !!parseBpFast(raw); }
+function detectSideEffectSymptomFast(t){
+  if (hasAnyFast(t,["ankle swelling","leg swelling","feet swelling","swollen ankle","swollen feet","swollen legs","pair sooj","paon sooj","pair suj","paon suj","پاؤں کی سوجن","پیروں کی سوجن","ٹخنوں کی سوجن","سوجن","سوج رہے","سوج رہی"])) return "swelling";
+  if (hasAnyFast(t,["dizziness","dizzy","feeling dizzy","feel dizzy","chakkar","chakar","چکر","lightheaded","light headed","سر گھوم","sar ghoom"])) return "dizziness";
+  if (hasAnyFast(t,["headache","head hurts","head pain","sar dard","sir dard","سر درد"])) return "headache";
+  if (hasAnyFast(t,["weakness","kamzori","کمزوری","thakawat","تھکاوٹ"])) return "weakness";
+  if (hasAnyFast(t,["nausea","matli","متلی","ji matlana","جی متلا"])) return "nausea";
+  if (hasAnyFast(t,["palpitation","palpitations","dharkan","دھڑکن","heart racing"])) return "palpitations";
+  return null;
+}
+function isExperiencingSideEffectFast(t){
+  return hasAnyFast(t,["i have","i am having","i'm having","i feel","feeling","i am feeling","mujhe","mere ko","mera","meri","ho raha","ho rahi","aa rahe","aa rahi","feel kar","مجھے","میرا","میری","ہو رہا","ہو رہی","آ رہے","آ رہی","میں محسوس"]);
+}
+function asksWhatToDoFast(t){
+  return hasAnyFast(t,["what should i do","what can i do","kya karun","kya karoon","kya karna","what to do","کیا کروں","کیا کرنا","کیا کرنا چاہیے","اب کیا"]);
+}
+function asksMedicineForSideEffectFast(t){
+  return hasAnyFast(t,["what medicine","which medicine","which med","konsi medicine","kaunsi medicine","kya dawa","konsi dawa","کون سی دوا","کونسی دوا","کیا دوا","medicine le","dawa le","دوائی لوں","دوا لوں","ساتھ کیا لوں","with extor"]);
+}
+function asksGenericSideEffectsFast(t){
+  // Only classify as the overall side-effect-list question when the caller is
+  // explicitly asking what the side effects are. Merely NAMING a symptom must
+  // never come here.
+  return hasAnyFast(t,[
+    "what are the side effects","what side effects","side effects kya","side effect kya","side effects bata","side effect bata",
+    "kya side effects","kon se side effects","kaun se side effects","سائیڈ ایفیکٹس کیا","سائیڈ ایفیکٹ کیا","کون سے سائیڈ ایفیکٹس","نقصانات کیا","کیا نقصانات"
+  ]);
+}
+
+function asksOtherMedicinesWithExtorFast(t){
+  return hasAnyFast(t,[
+    "other medicine","other medicines","another medicine","another medicines","any medicine with extor","medicines with extor",
+    "what can i take with extor","what else can i take","can i take anything else","koi aur medicine","koi aur dawa","aur medicine",
+    "aur dawa","saath konsi dawa","ساتھ کون سی دوا","ساتھ کونسی دوا","کوئی اور دوا","اور دوا","ساتھ کیا لے"
+  ]);
+}
+function sideEffectHelpAnswerFast(symptom, wantsMedicine){
+  if (wantsMedicine) return FAST_EXTOR_ANSWERS.side_effect_medicine;
+  const map={
+    headache:FAST_EXTOR_ANSWERS.side_effect_headache,
+    dizziness:FAST_EXTOR_ANSWERS.side_effect_dizziness,
+    swelling:FAST_EXTOR_ANSWERS.side_effect_swelling,
+    weakness:FAST_EXTOR_ANSWERS.side_effect_weakness,
+    nausea:FAST_EXTOR_ANSWERS.side_effect_nausea,
+    palpitations:FAST_EXTOR_ANSWERS.side_effect_palpitations
+  };
+  return map[symptom] || FAST_EXTOR_ANSWERS.side_effect_help_general;
+}
+function progressiveSideEffectAnswerFast(symptom, wantsMedicine){
+  if (wantsMedicine) return FAST_EXTOR_ANSWERS.side_effect_medicine;
+  const key=symptom || "general";
+  const count=Number((fastState.sideEffectCounts||{})[key] || 0);
+  fastState.sideEffectCounts = fastState.sideEffectCounts || {};
+  fastState.sideEffectCounts[key]=count+1;
+  if (count === 0) return sideEffectHelpAnswerFast(symptom,false);
+  const second={
+    dizziness:"اگر چکر ابھی بھی ہیں تو بیٹھے یا لیٹے رہیں اور بلڈ پریشر چیک کریں؛ اگر بہت شدید ہوں، بےہوشی لگے یا چلنا مشکل ہو تو فوراً ڈاکٹر سے رابطہ کریں۔",
+    swelling:"اگر سوجن برقرار ہے یا بڑھ رہی ہے تو خود سے کوئی نئی دوا نہ لیں؛ اپنے ڈاکٹر سے ایکسٹور کا علاج جلد ریویو کروائیں۔",
+    headache:"اگر سر درد بار بار ہو رہا ہے تو بلڈ پریشر چیک کریں؛ شدید یا غیر معمولی درد ہو تو ڈاکٹر سے معائنہ کروائیں۔",
+    weakness:"اگر کمزوری برقرار ہے تو بلڈ پریشر چیک کریں اور پانی مناسب مقدار میں لیں؛ شدید کمزوری یا بےہوشی میں فوری طبی مدد لیں۔",
+    nausea:"اگر متلی جاری ہے یا الٹی ہو رہی ہے تو پانی برقرار رکھیں اور ڈاکٹر یا فارماسسٹ سے رابطہ کریں؛ خود سے نئی دوا شامل نہ کریں۔",
+    palpitations:"اگر دھڑکن بار بار تیز ہو رہی ہے تو آرام کریں اور جلد ڈاکٹر سے رابطہ کریں؛ سینے کے درد یا سانس کی دشواری میں فوری مدد لیں۔"
+  };
+  if (count === 1) return second[symptom] || "اگر یہ علامت برقرار ہے یا بڑھ رہی ہے تو ڈاکٹر یا فارماسسٹ سے رابطہ کریں؛ خود سے نئی دوا شروع نہ کریں۔";
+  return "چونکہ یہ علامت برقرار ہے، بہتر ہے اب اپنے ڈاکٹر یا فارماسسٹ سے براہِ راست رابطہ کریں؛ اگر علامات شدید ہوں تو فوری طبی مدد لیں۔";
+}
+
+
+// Multi-signal intent router -------------------------------------------------
+// Do not trust a single ambiguous keyword. Each intent is evaluated across
+// independent signal groups: TOPIC, ACTION and CONTEXT. A normal fast-path
+// intent needs at least 2 agreeing groups (or an explicit high-confidence
+// medical pattern such as a named Extor strength). This prevents words like
+// "available" from turning "what variations are available?" into a pharmacy
+// lookup.
+const INTENT_SIGNAL_RULES = {
+  dose_frequency: {
+    topic:["twice","twice a day","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو دفعہ","2 گولی","دو گولی","دو گولیاں","din mein 2","din mein do","دن میں دو","ایک دن میں دو","روز دو"],
+    action:["can i","should i","kya main","کیا میں","le sakta","le sakti","لے سکتا","لے سکتی","take","lena","لوں","لینا","kitni baar","how many times","کتنی بار"],
+    context:["extor","ایکسٹور","tablet","goli","گولی","dose","خوراک","medicine","دوا"]
+  },
+  strengths: {
+    topic:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","ورائٹی","5/80","5 80","5/160","5 160","10/160","10 160"],
+    action:["what","which","how many","available","different","difference","kitni","kis kis","kin","کون","کتنی","کیا"],
+    context:["extor","ایکسٹور","amlodipine","valsartan","mg","dose","tablet","goli","گولی"]
+  },
+  price: {
+    topic:["price","prices","cost","rate","قیمت","دام","روپے","rs","pkr","kitne ki","kitni ki","کتنے کی","کتنی کی"],
+    action:["what","how much","kitna","kitni","کیا","کتنا","کتنی","tell","bata","بتا"],
+    context:["extor","ایکسٹور","5/80","5 80","5/160","5 160","10/160","10 160","pack","strip","tablet","گولی"]
+  },
+  competitor: {
+    topic:["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus"," vs ","better","best","متبادل","مقابلہ","فرق","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valsar-m","valtan","valtec"],
+    action:["which","what","why","compare","difference","better","best","konsa","kaunsa","کیوں","کون سا","فرق"],
+    context:["extor","ایکسٹور","amlodipine","valsartan","brand","medicine","دوا"]
+  },
+  purchase: {
+    topic:["buy","purchase","pharmacy","فارمیسی","medical store","میڈیکل اسٹور","milega","milay","ملے","خرید"],
+    action:["where","kahan","کہاں","from where","available at","stock","availability"],
+    context:["extor","ایکسٹور","5/80","5 80","5/160","5 160","10/160","10 160"]
+  },
+  timing: {
+    topic:["timing","time","waqt","وقت","morning","evening","night","صبح","شام","رات","daily time","روز"],
+    action:["when","kab","کب","what time","kis waqt","کس وقت"],
+    context:["take","len","lena","leni","لیں","لینا","لینی","extor","ایکسٹور","tablet","goli","دوا"]
+  },
+  food: {
+    topic:["food","khana","khane","کھانا","کھانے","empty stomach","خالی پیٹ","meal","کھانے سے"],
+    action:["with","without","before","after","sath","ساتھ","pehle","baad","پہلے","بعد"],
+    context:["take","len","lena","leni","لیں","extor","ایکسٹور","tablet","دوا"]
+  },
+  missed_dose: {
+    topic:["miss","missed","bhool","بھول","dose reh","خوراک رہ"],
+    action:["what do","what should","kya kar","کیا کر","if","agar","اگر"],
+    context:["dose","خوراک","extor","ایکسٹور","tablet","goli","گولی"]
+  },
+  stopping: {
+    topic:["stop","stopping","band","بند","چھوڑ","chor dun","chhor dun"],
+    action:["can i","should i","kya main","کیا میں","when","kab","کب"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا","tablet","goli"]
+  },
+  side_effects: {
+    topic:["side effect","side effects","سائیڈ ایفیکٹ","سائیڈ ایفیکٹس","nuksan","nuqsan","نقصان","نقصانات"],
+    action:["what","which","tell","bata","بتا","kon se","kaun se","کون سے","kya","کیا"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا","tablet"]
+  },
+  other_medicines: {
+    topic:["other medicine","other medicines","another medicine","koi aur medicine","koi aur medicines","koi aur dawa","dusri medicine","doosri medicine","اور دوا","کوئی اور دوا","اور میڈیسن","کوئی اور میڈیسن","دوسری دوا","دوسری میڈیسن","interaction","ساتھ کون سی دوا","ساتھ کون سی میڈیسن"],
+    action:["can i take","can take","what can i take","kya le","kya main le","لے سکتا","لے سکتی","کیا لے","کیا میں لے","saath","ساتھ"],
+    context:["extor","ایکسٹور","with extor","ساتھ"]
+  },
+  how_to_take: {
+    topic:["dose","dosage","خوراک","tablet","goli","گولی","swallow","نگل","water","pani","پانی","milk","doodh","دودھ","juice","مشروب"],
+    action:["how","kaise","کیسے","how to take","kitni","کتنی","method","طریقہ","with","sath","ساتھ","swallow","نگل"],
+    context:["extor","ایکسٹور","take","lena","leni","لینا","لینی","medicine","dawa","دوا"]
+  },
+  what_is: {
+    topic:["what is","kya hai","کیا ہے","use","uses","استعمال","kis liye","کس لیے","why prescribed","kyun di","کیوں دی"],
+    action:["what","why","kis","kyun","کیا","کیوں","کس"],
+    context:["extor","ایکسٹور","amlodipine","valsartan","bp medicine","بلڈ پریشر کی دوا"]
+  },
+  co_extor: {
+    topic:["co-extor","co extor","کو ایکسٹور"],
+    action:["difference","different","فرق","what","کیا"],
+    context:["extor","ایکسٹور"]
+  }
+};
+
+function signalGroupHitFast(t, arr){ return (arr || []).some(x => t.includes(x)); }
+function scoreIntentSignalsFast(t, intent){
+  const r=INTENT_SIGNAL_RULES[intent];
+  if (!r) return {score:0, userScore:0, groups:[], explicitContext:false};
+  const groups=[];
+  const topicHit=signalGroupHitFast(t,r.topic);
+  const actionHit=signalGroupHitFast(t,r.action);
+  const contextHit=signalGroupHitFast(t,r.context);
+  if (topicHit) groups.push("topic");
+  if (actionHit) groups.push("action");
+  if (contextHit) groups.push("context");
+  // IMPORTANT: existing call state is useful background, but it is NOT evidence
+  // for choosing the intent. We need at least two clues in THIS utterance.
+  const userScore=(topicHit?1:0)+(actionHit?1:0)+(contextHit?1:0);
+  return {score:userScore, userScore, groups, explicitContext:contextHit};
+}
+function bestMultiSignalIntentFast(t){
+  let best=null, second=null;
+  for (const intent of Object.keys(INTENT_SIGNAL_RULES)){
+    const s=scoreIntentSignalsFast(t,intent);
+    const item={intent, ...s};
+    if (!best || item.userScore > best.userScore){ second=best; best=item; }
+    else if (!second || item.userScore > second.userScore){ second=item; }
+  }
+  // A fast answer needs the ACTUAL topic plus at least one supporting clue
+  // in the CURRENT sentence. Generic words like "kya" + "goli" are never
+  // enough to turn a dose-frequency question into strengths.
+  if (!best || best.userScore < 2 || !best.groups.includes("topic")) return null;
+  if (second && second.userScore === best.userScore && second.groups.includes("topic")) return null;
+  return best;
+}
+function bestLearnedIntentFast(rawText){
+  let best=null;
+  for (const [intent, phrases] of Object.entries(learnedIntentPhrases || {})){
+    if (!FAST_EXTOR_ANSWERS[intent] && intent !== "purchase") continue;
+    for (const p of (phrases || [])){
+      const sim=similarityFast(rawText,p);
+      if (!best || sim > best.similarity) best={intent, similarity:sim, phrase:p};
+    }
+  }
+  if (!best) return null;
+  const signal=scoreIntentSignalsFast(normFast(rawText), best.intent);
+  // Learned language is strong evidence, but require another supporting clue
+  // unless the phrasing is nearly identical. This prevents poisoned/ambiguous
+  // one-keyword matches from taking over later calls.
+  // Learned wording must be very close, or it still needs two current-utterance
+  // signals. This prevents an old learned phrase from hijacking a different question.
+  const accepted=(best.similarity >= 0.92) || (best.similarity >= 0.76 && signal.userScore >= 2);
+  return accepted ? {...best, signalScore:signal.userScore} : null;
+}
+
+function priceAnswerFast(t){
+  const strength = detectStrengthFast(t);
+  const map = EXTOR_COMMERCIAL_INFO.prices_pkr;
+  if (strength){
+    const key = String(strength).replace(/mg/gi, "").replace(/\s+/g, "");
+    const row = map[key];
+    if (row) return `موجودہ آن لائن ریفرنس کے مطابق ایکسٹور ${key} کے 14 گولیوں کے پیک کی قیمت تقریباً ${row.low} سے ${row.high} روپے ہے؛ موجودہ فارمیسی قیمت کنفرم کر لیجیے۔`;
+  }
+  return FAST_EXTOR_ANSWERS.price;
+}
+function competitorAnswerFast(t){
+  if (t.includes("exforge")){
+    return "Exforge اور Extor دونوں ایملوڈیپین پلس والسارٹن برانڈز ہیں؛ موجودہ لسٹڈ قیمتوں میں Extor کئی مشترک طاقتوں پر نمایاں طور پر کم قیمت ہے، مگر برانڈ تبدیلی ڈاکٹر یا فارماسسٹ سے کریں۔";
+  }
+  return FAST_EXTOR_ANSWERS.competitor;
+}
+
+function detectExtorIntentFast(t){
+  // HARD PRIORITY: if a caller reports a concrete symptom, treat it as a
+  // patient symptom-management turn. Learned phrases are intentionally checked
+  // AFTER this so an old learned "side_effects" phrase can never override it.
+  const reportedSymptom = detectSideEffectSymptomFast(t);
+  if (reportedSymptom && (isExperiencingSideEffectFast(t) || asksWhatToDoFast(t) || asksMedicineForSideEffectFast(t))) return "side_effect_help";
+  if (reportedSymptom && fastState.lastIntent === "side_effects") return "side_effect_help";
+
+  // Explicit interaction wording in the CURRENT question outranks learned
+  // phrases. Example: "Can I take any other medicine with Extor?" must never
+  // become strengths just because a previous learned phrase was similar.
+  const sideEffectContextNow = hasAnyFast(t,["side effect","side effects","سائیڈ ایفیکٹ","نقصان","symptom","علامت"]);
+  if (asksOtherMedicinesWithExtorFast(t) && !sideEffectContextNow) return "other_medicines";
+
+  // Explicit dose-frequency / extra-tablet questions outrank strengths.
+  // Examples: "can I take it twice a day?", "din mein 2 goli le sakta hoon?"
+  if (hasAnyFast(t,["twice a day","twice","two times","2 times","2 tablets","two tablets","do baar","2 baar","دو بار","دو دفعہ","دو گولی","دو گولیاں","din mein 2","din mein do","دن میں دو","ایک دن میں دو","روز دو"]) &&
+      hasAnyFast(t,["take","lena","leni","loun","loon","لوں","لینا","لے سکتا","لے سکتی","goli","گولی","tablet","dose","خوراک"])) return "dose_frequency";
+
+  // Commercial questions: explicit price/comparison wording should not drift
+  // into purchase or strengths. They still require the current question to
+  // contain actual price/comparison evidence.
+  if (hasAnyFast(t,["price","prices","cost","rate","قیمت","دام","روپے","pkr","kitne ki","kitni ki","کتنے کی","کتنی کی"]) &&
+      hasAnyFast(t,["extor","ایکسٹور","5/80","5 80","5/160","5 160","10/160","10 160","pack","strip","tablet","گولی"])) return "price";
+  if (hasAnyFast(t,["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus","better","best","متبادل","مقابلہ","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valsar-m","valtan","valtec"]) &&
+      hasAnyFast(t,["extor","ایکسٹور","brand","medicine","دوا","amlodipine","valsartan"])) return "competitor";
+
+  // First use multi-signal matching. A fast answer is selected only when at
+  // least two independent parts of the question agree on the same intent.
+  const multi = bestMultiSignalIntentFast(t);
+  if (multi){
+    console.log(`[intent-score] ${multi.intent} score=${multi.score} groups=${multi.groups.join("+")}`);
+    return multi.intent;
+  }
+
+  // Then reuse caller wording learned from previous successful calls, with a
+  // similarity + supporting-signal gate rather than raw substring matching.
+  const learnedIntent = bestLearnedIntentFast(t);
+  if (learnedIntent){
+    console.log(`[intent-learned] ${learnedIntent.intent} sim=${learnedIntent.similarity.toFixed(2)} signal=${learnedIntent.signalScore}`);
+    return learnedIntent.intent;
+  }
+
+  // No broad one-keyword fallback here. If the current sentence did not pass
+  // multi-signal or strict learned matching, keep only truly explicit/safety
+  // patterns below; otherwise return unknown_extor so Claude verifies the full meaning.
+  if (hasAnyFast(t,["overdose","زیادہ خوراک","زیادہ گولیاں","extra dose"])) return "overdose";
+  if (hasAnyFast(t,["سانس میں دشواری","difficulty breathing","چہرے کی سوجن","ہونٹوں کی سوجن","گلے کی سوجن","emergency"])) return "emergency";
+  const seSymptom = detectSideEffectSymptomFast(t);
+  const mentionsSideEffectContext = hasAnyFast(t,["side effect","side effects","سائیڈ ایفیکٹ","نقصان","nuksan","nuqsan","symptom","symptoms","علامت","علامات"]);
+  // If the caller is asking for another medicine specifically FOR an Extor
+  // side effect, keep it in the side-effect-management path. Generic
+  // "can I take another medicine with Extor?" stays in interaction advice.
+  if ((asksMedicineForSideEffectFast(t) || asksOtherMedicinesWithExtorFast(t)) &&
+      (mentionsSideEffectContext || seSymptom || fastState.lastIntent === "side_effects" || fastState.lastIntent === "side_effect_help")) return "side_effect_help";
+  if (asksOtherMedicinesWithExtorFast(t)) return "other_medicines";
+  if (seSymptom && (isExperiencingSideEffectFast(t) || asksWhatToDoFast(t) || asksMedicineForSideEffectFast(t))) return "side_effect_help";
+  if ((asksWhatToDoFast(t) || asksMedicineForSideEffectFast(t)) && (fastState.lastIntent === "side_effects" || fastState.lastIntent === "side_effect_help")) return "side_effect_help";
+  if (asksMedicineForSideEffectFast(t) && mentionsSideEffectContext) return "side_effect_help";
+  // Generic list only for an explicit "what are the side effects?" question.
+  if (asksGenericSideEffectsFast(t)) return "side_effects";
+  // Any concrete side-effect symptom that reaches this point is still treated
+  // as symptom management, never as a request to repeat the whole list.
+  if (seSymptom) return "side_effect_help";
+  if (hasAnyFast(t,["water","pani","پانی","milk","doodh","دودھ"]) && hasAnyFast(t,["with","sath","ساتھ","take","lena","leni","لوں","لینا","لینی","swallow","نگل"])) return "how_to_take";
+  if (hasAnyFast(t,["with food or without food","کھانے کے ساتھ یا بغیر","empty stomach or after food"])) return "food";
+  if (hasAnyFast(t,["when should i take extor","what time should i take extor","ایکسٹور کس وقت لوں","ایکسٹور کب لوں"])) return "timing";
+  if (hasAnyFast(t,["how should i take extor","how to take extor","ایکسٹور کیسے لوں"])) return "how_to_take";
+  if (hasAnyFast(t,["what is extor","ایکسٹور کیا ہے","what is extor used for","ایکسٹور کس لیے ہے"])) return "what_is";
+  return "unknown_extor";
+}
+
+function looksExtorFollowupFast(t){
+  return hasAnyFast(t,[
+    "tablet","medicine","medicin","dawa","دوا","goli","گولی","take","lena","leni","lain","len","لینی","لیں",
+    "dose","خوراک","twice","do baar","دو بار","دو گولی","time","timing","وقت","morning","evening","night","صبح","شام","رات",
+    "food","khana","khane","کھانا","کھانے","empty stomach","خالی پیٹ","water","پانی",
+    "miss","bhool","بھول","side effect","nuksan","سائیڈ","نقصان","swelling","سوجن","chakkar","چکر",
+    "bp","blood pressure","بلڈ پریشر","pressure","پریشر","pregnan","حمل","stop","بند","strength","power","طاقت",
+    "safe","safely","احتیاط","kidney","گردے","liver","جگر","interaction","ساتھ لے","ساتھ لوں","coffee","tea","چائے","fasting","روزہ"
+  ]);
+}
+
+function isClearlyUnrelatedFast(t){
+  if (mentionsExtorFast(t)) return false;
+  return hasAnyFast(t,[
+    "panadol","brufen","augmentin","flagyl","disprin","paracetamol","ibuprofen",
+    "skin","acne","pimple","بالوں","hair","shampoo","facial","rash treatment",
+    "fever","بخار","cough","کھانسی","headache","سر درد","stomach pain","پیٹ درد",
+    "match","cricket","football","weather","موسم","news","politics","election","prime minister","president","movie","recipe","joke","capital of"
+  ]);
+}
+
+function areaMatchFast(text, entries){
+  const t=normFast(text);
+  const aliases={
+    "dha":["dha","defence","defense","ڈی ایچ اے","ڈیفنس"],
+    "clifton":["clifton","کلفٹن","sea view"],
+    "gulshan-e-iqbal":["gulshan","گلشن","گلشن اقبال"],
+    "north nazimabad":["north nazimabad","نارتھ ناظم آباد","nazimabad","ناظم آباد"],
+    "pechs":["pechs","پی ای سی ایچ ایس"],
+    "gulistan-e-johar":["johar","جوہر","gulistan-e-johar","گلستان جوہر"],
+    "malir":["malir","ملیر"],
+    "saddar":["saddar","صدر"],
+    "federal b area":["federal b","fb area","f.b area","فیڈرل بی","karimabad","کریم آباد"],
+    "stadium road":["stadium","اسٹیڈیم"]
+  };
+  for (const e of entries){
+    const hay=normFast([e.area_en,e.area,e.area_ur,e.address_ur].filter(Boolean).join(" "));
+    if (hay && (t.includes(hay) || hay.includes(t))) return e;
+    for (const vals of Object.values(aliases)){
+      if (vals.some(a=>t.includes(normFast(a))) && vals.some(a=>hay.includes(normFast(a)))) return e;
+    }
+  }
+  return null;
+}
+
+function doctorMatchesFast(text, maxCount=3){
+  const t=normFast(text);
+  const zoneAliases={
+    clifton:["clifton","کلفٹن","sea view"],
+    dha:["dha","defence","defense","ڈی ایچ اے","ڈیفنس"],
+    gulshan:["gulshan","گلشن","gulshan-e-iqbal","گلشن اقبال"],
+    north:["north nazimabad","نارتھ ناظم آباد","nazimabad","ناظم آباد"],
+    malir:["malir","ملیر"],
+    stadium:["stadium","اسٹیڈیم"],
+    saddar:["saddar","صدر","m.a. jinnah","جناح روڈ"],
+    hadeed:["gulshan-e-hadeed","gulshan e hadeed","گلشن حدید"]
+  };
+  let zone=null;
+  for (const [z,vals] of Object.entries(zoneAliases)){ if(vals.some(a=>t.includes(normFast(a)))) { zone=z; break; } }
+  const nearby={
+    clifton:["clifton","dha","stadium"], dha:["dha","clifton","stadium"],
+    gulshan:["gulshan","stadium","north"], north:["north","gulshan","stadium"],
+    malir:["malir","hadeed","gulshan"], stadium:["stadium","gulshan","clifton"],
+    saddar:["saddar","clifton","stadium"], hadeed:["hadeed","malir","gulshan"]
+  };
+  const zoneForDoctor=(d)=>{
+    const h=normFast([d.area_en,d.area,d.facility].filter(Boolean).join(" "));
+    for(const [z,vals] of Object.entries(zoneAliases)){ if(vals.some(a=>h.includes(normFast(a)))) return z; }
+    return null;
+  };
+  const wanted=zone ? (nearby[zone]||[zone]) : [];
+  const ranked=[];
+  DOCTORS.forEach((d,idx)=>{
+    const dz=zoneForDoctor(d);
+    let score=0;
+    if(zone && dz===zone) score=100;
+    else if(zone && wanted.includes(dz)) score=70-wanted.indexOf(dz)*10;
+    else if(!zone) score=10;
+    ranked.push({d,score,idx});
+  });
+  ranked.sort((a,b)=>b.score-a.score || a.idx-b.idx);
+  return ranked.filter(x=>x.score>0).slice(0,maxCount).map(x=>x.d);
+}
+
+async function logLearningFast(text, intent, matched, usedClaude, latencyMs, source="BUILT_IN"){
+  try{
+    fetch(apiUrl("/api/learn"), { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({callId,text,intent,matched,usedClaude,latencyMs,source}) }).catch(()=>{});
+  }catch(e){}
+}
+function syncFastStateFromClaude(s){
+  if (!s) return;
+  if (s.name) fastState.name = s.name;
+  if (s.prescription_status) fastState.prescription = s.prescription_status;
+  if (s.area) fastState.area = s.area;
+  if (s.weight_kg) fastState.weightKg = s.weight_kg;
+  if (s.usual_bp) fastState.usualBp = s.usual_bp;
+  if (s.requested_strength) fastState.requestedStrength = s.requested_strength;
+  if (s.purchase_intent) fastState.purchase = true;
+  // Do not advance onboarding here. Camera verification transitions are
+  // handled once, centrally in callClaude(), where the pre-sync state is known.
+}
+function compactSpokenReply(text){
+  // One call turn must produce ONE complete spoken thought. We never cut a
+  // sentence by characters/words and we never carry a second explanation into
+  // another speaking phase after the microphone has reopened.
+  let s=String(text||"").replace(/\s+/g," ").trim();
+  if (!s) return s;
+  const sentences=(s.match(/[^۔.!?؟]+[۔.!?؟]?/g) || [s]).map(x=>x.trim()).filter(Boolean);
+  let first=sentences[0] || s;
+
+  // If Claude put an essential safety warning in sentence two, fold only a
+  // short warning into the SAME sentence with an Urdu semicolon; otherwise
+  // discard extra explanation for this turn.
+  if (sentences.length > 1){
+    const second=sentences[1];
+    const safety=/ڈاکٹر|فارماسسٹ|فوری|ایمرجنسی|doctor|pharmacist|emergency|بےہوش|سانس|سینے/i.test(second);
+    if (safety && (first.length + second.length) <= 185){
+      first=first.replace(/[۔.!?؟]+$/,'').trim() + '؛ ' + second.replace(/^[۔.!?؟\s]+/,'').replace(/[۔.!?؟]+$/,'').trim();
+    }
+  }
+  first=first.replace(/\s+/g,' ').trim();
+  if (first && !/[۔.!?؟]$/.test(first)) first += '۔';
+  return first;
+}
+
+// For stable, approved educational intents, the hidden intent label and the
+// spoken answer must never disagree. If Claude correctly classifies a caller's
+// unusual wording into one of these intents, discard any contaminated prose and
+// use the locked approved answer for that intent. Nuanced symptom/other_extor
+// questions still keep Claude's exact answer.
+const INTENT_LOCKED_CANONICAL = new Set([
+  "what_is","strengths","dose_frequency","side_effects","other_medicines","missed_dose",
+  "how_to_take","timing","food","stopping","co_extor","overdose","emergency","price","competitor"
+]);
+function lockSpokenAnswerToIntent(spokenText, stateObj, currentQuestion=""){
+  const intent = stateObj && stateObj.intent;
+  if (intent === "strengths"){
+    console.log(`[intent-lock] strengths -> approved strength-specific answer`);
+    return strengthAnswerFast(currentQuestion);
+  }
+  if (intent && INTENT_LOCKED_CANONICAL.has(intent) && FAST_EXTOR_ANSWERS[intent]){
+    console.log(`[intent-lock] ${intent} -> approved canonical answer`);
+    return FAST_EXTOR_ANSWERS[intent];
+  }
+  return spokenText;
+}
+
+let userTurnSerial = 0;
+let responseCommittedTurn = 0;
+let lastCommittedTranscript = "";
+let lastCommittedTranscriptAt = 0;
+
+async function fastSpeakResponse(text, intent, opts={}){
+  const turnId = userTurnSerial;
+  if (turnId && responseCommittedTurn === turnId){
+    console.log(`[turn-lock] DROPPED_SECOND_RESPONSE turn=${turnId} intent=${intent}`);
+    return;
+  }
+  if (turnId) responseCommittedTurn = turnId;
+  text = compactSpokenReply(text);
+  processingReply = true;
+  micBtn.disabled = true;
+  micHint.textContent = "ثانیہ جواب دے رہی ہیں...";
+  liveCaption.textContent = text;
+  const started=performance.now();
+  await speak(text, null, opts.tone || "normal");
+  liveCaption.textContent = "";
+  await logLearningFast(opts.userText || "", intent, true, false, Math.round(performance.now()-started), opts.source || "BUILT_IN");
+  // Preserve locally handled turns for any later Claude fallback. This lets the
+  // fallback continue the same personalized call instead of starting cold.
+  if (opts.userText){
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "user" || last.content !== opts.userText) messages.push({role:"user", content:opts.userText});
+    messages.push({role:"assistant", content:text});
+    if (messages.length > 20) messages = messages.slice(-20);
+  }
+  if (opts.requestPhoto){
+    processingReply = false;
+    await openCameraForPrescription();
+    return;
+  }
+  processingReply = false;
+  micBtn.disabled = false;
+  startListening();
+}
+
+function isConversationAckFast(raw){
+  const t=normFast(raw);
+  if (!t) return false;
+  const exact = new Set([
+    "theek ho gaya","theek hogaya","theek hai","thik ho gaya","thik hogaya","thik hai",
+    "okay","ok","okay thanks","ok thanks","thanks","thank you","got it","understood",
+    "acha","achha","accha","جی ٹھیک ہے","ٹھیک ہے","ٹھیک ہو گیا","شکریہ","سمجھ گیا","سمجھ گئی"
+  ]);
+  if (exact.has(t)) return true;
+  return /^(?:okay|ok|thanks|thank you|got it|understood|theek(?: hai| ho ?gaya)?|thik(?: hai| ho ?gaya)?|acha|achha|accha|ٹھیک(?: ہے| ہو گیا)?|شکریہ|سمجھ (?:گیا|گئی)|جی ٹھیک ہے)[.!؟? ]*$/i.test(String(raw||"").trim());
+}
+
+async function tryFastExtorRoute(rawText){
+  const t=normFast(rawText);
+  if (!t) return true;
+
+  // After onboarding, short acknowledgements are NOT medical questions.
+  // Keep the call in general Q&A and invite the caller to ask their Extor question.
+  if (fastState.onboardingComplete && !fastState.awaiting && isConversationAckFast(rawText)){
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_extor_question, "conversation_ack", {userText:rawText}), true;
+  }
+
+  // Natural opening: learn the caller's name locally with no Claude round-trip.
+  if (fastState.awaiting === "name"){
+    // A very common first response is just "wa alaikum salam". Treat it as a
+    // greeting acknowledgement, not as the caller's name.
+    if (isGreetingAckFast(t) && !/(?:naam|نام|my name|میں|main|mein)/i.test(rawText)) {
+      fastState.awaiting="name";
+      return fastSpeakResponse(FAST_EXTOR_ANSWERS.greeting_ack_name, "greeting_ack", {userText:rawText}), true;
+    }
+    fastState.nameAttempts = (fastState.nameAttempts || 0) + 1;
+    let name=extractNameFast(rawText);
+    // Soniox sometimes drops the beginning of a short name turn. If the final
+    // transcript is only 1-3 words and not a greeting/question, use the most
+    // plausible token instead of asking the caller to repeat unnecessarily.
+    if (!name){
+      const cleaned = normFast(rawText).split(" ").filter(Boolean);
+      const stop = new Set(["mera","naam","hai","hey","he","hain","my","name","is","ji","jee","yes","haan","han","میرا","نام","ہے","ہیں","جی","ہاں"]);
+      const plausible = cleaned.filter(w => !stop.has(w));
+      if (plausible.length >= 1 && plausible.length <= 3) name = plausible.slice(0,2).join(" ");
+    }
+    if (!name){
+      // Do not force one hard-coded name sentence. For an unfamiliar language
+      // or word order, let Claude extract only the caller name once; the hidden
+      // state will return us directly to the prescription step.
+      fastState.awaiting="name";
+      fastState.pendingIntent="name_capture";
+      return false;
+    }
+    fastState.name=name;
+    fastState.nameAttempts=0;
+    fastState.awaiting="prescription";
+    // Warm one personalized line in the background after we learn the name.
+    // The immediate next question remains the already-cached prescription line,
+    // so this does not add latency to the name turn.
+    prefetchTTS(`${name}، شکریہ؛ اب ایکسٹور کے بارے میں آپ کیا جاننا چاہیں گے؟`);
+    // Keep this first follow-up on the cached path for speed. The stored name is
+    // carried into all later Claude fallbacks and can be used naturally later.
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_help, "caller_name_then_prescription", {userText:rawText}), true;
+  }
+
+  // HARD ONBOARDING GATE: prescription -> weight -> BP -> BP context.
+  // No normal Extor intent is allowed to run until this sequence completes.
+  if (fastState.awaiting === "weight"){
+    fastState.weightAttempts = (fastState.weightAttempts || 0) + 1;
+    const weight=parseWeightFast(rawText);
+    if (!weight){
+      // "I don't know" is a valid answer. Never trap the caller in a loop.
+      if (isUnknownVitalFast(rawText) || fastState.weightAttempts >= 2){
+        fastState.weightKg="unknown";
+        fastState.weightAttempts=0;
+        fastState.awaiting="bp";
+        return fastSpeakResponse(FAST_EXTOR_ANSWERS.weight_unknown_ack, "weight_unknown_then_bp", {userText:rawText}), true;
+      }
+      return fastSpeakResponse("اگر وزن معلوم ہے تو کلو میں بتا دیجیے، ورنہ کہہ دیجیے کہ معلوم نہیں۔", "weight_clarify", {userText:rawText}), true;
+    }
+    fastState.weightKg=weight;
+    fastState.weightAttempts=0;
+    fastState.awaiting="bp";
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_bp, "weight_then_bp", {userText:rawText}), true;
+  }
+
+  if (fastState.awaiting === "bp"){
+    // BP is the FINAL onboarding question. Any genuine spoken reply completes
+    // this step: if we can parse a reading, keep it; otherwise mark BP unknown.
+    // Never trap the caller in a BP clarification loop.
+    fastState.bpAttempts = (fastState.bpAttempts || 0) + 1;
+    const bp=parseBpFast(rawText);
+    fastState.bpAttempts=0;
+    fastState.pendingIntent=null;
+    fastState.afterVitals=null;
+    fastState.awaiting=null;
+    fastState.onboardingComplete=true;
+
+    if (!bp){
+      fastState.usualBp="unknown";
+      fastState.bpCategory="unknown";
+      return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_extor_question, "bp_unknown_continue", {userText:rawText}), true;
+    }
+
+    fastState.usualBp=bp.raw;
+    const cat=classifyBpFast(bp);
+    fastState.bpCategory=cat.key;
+    return fastSpeakResponse(`${cat.ur}؛ ${FAST_EXTOR_ANSWERS.ask_extor_question}`, "bp_context", {userText:rawText}), true;
+  }
+
+  // Answer expected follow-up turns even when the caller doesn't repeat "Extor".
+  if (fastState.awaiting === "prescription"){
+    // Positive possession/found signals are checked first so sentences like
+    // "I didn't have it before but I found it now" advance to verification.
+    if (prescriptionNowAvailableFast(t)){
+      fastState.prescription="yes_unverified";
+      fastState.awaiting=null;
+      return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_photo, "prescription_yes", {userText:rawText, requestPhoto:true}), true;
+    }
+    if (isNoFast(t)){
+      fastState.prescription="none";
+      fastState.pendingIntent=null;
+      fastState.afterVitals=null;
+      fastState.awaiting="prescription_blocked";
+      return fastSpeakResponse(FAST_EXTOR_ANSWERS.no_prescription_stop, "prescription_required", {userText:rawText}), true;
+    }
+    return fastSpeakResponse("معذرت، صرف یہ بتا دیجیے کہ ایکسٹور کا ڈاکٹر کا نسخہ موجود ہے یا نہیں؟", "prescription_clarify", {userText:rawText}), true;
+  }
+
+  if (fastState.awaiting === "prescription_blocked"){
+    // No patient-specific Extor instructions until a prescription is available.
+    // If the caller now says they have one, move directly to verification.
+    if (prescriptionNowAvailableFast(t)){
+      fastState.prescription="yes_unverified";
+      fastState.awaiting=null;
+      return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_photo, "prescription_now_available", {userText:rawText, requestPhoto:true}), true;
+    }
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.no_prescription_stop, "prescription_required", {userText:rawText}), true;
+  }
+
+  if (fastState.awaiting === "store_area"){
+    fastState.area=rawText;
+    const s=areaMatchFast(rawText, MEDICAL_STORES);
+    fastState.awaiting=null;
+    const line=s ? `جی، ${s.name_ur} ایک قریب آپشن ہے؛ ایکسٹور کی مطلوبہ طاقت فون پر کنفرم کر لیجیے۔` : "اس علاقے کی تصدیق شدہ فارمیسی لسٹنگ میرے پاس نہیں؛ قریبی مستند فارمیسی سے اسٹاک کنفرم کر لیجیے۔";
+    return fastSpeakResponse(line, "pharmacy_referral", {userText:rawText}), true;
+  }
+
+  // Once the caller has explicitly said there is no prescription, keep the
+  // flow simple and predictable: do not route into strengths/timing/side effects
+  // or doctor-area logic until a prescription is available and verified.
+  if (fastState.prescription === "none"){
+    fastState.awaiting="prescription_blocked";
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.no_prescription_stop, "prescription_required", {userText:rawText}), true;
+  }
+
+  // The call already has Extor context, so callers should not have to repeat
+  // "Extor" in every sentence. Block only topics that are clearly unrelated.
+  if (!mentionsExtorFast(t) && isClearlyUnrelatedFast(t)){
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.off_topic, "off_topic", {userText:rawText}), true;
+  }
+
+  const intent=detectExtorIntentFast(t);
+  console.log(`[fast-route] ${intent}: ${rawText}`);
+
+  // If the caller says they are actually experiencing a side effect, do not
+  // repeat the side-effect list. Switch to symptom-specific management.
+  if (intent === "side_effect_help"){
+    const symptom = detectSideEffectSymptomFast(t) || fastState.lastSideEffect;
+    const wantsMedicine = asksMedicineForSideEffectFast(t);
+    fastState.lastIntent = "side_effect_help";
+    if (symptom) fastState.lastSideEffect = symptom;
+
+    // A nuanced/new side-effect question gets one proper Claude pass. Once
+    // Claude answers it, that wording+answer is cached for future callers.
+    const learned = findLearnedAnswerFast(rawText, wantsMedicine ? "side_effect_medicine" : "side_effect_help");
+    const nuanced = rawText.length > 55 || hasAnyFast(t,["why","kyun","کیوں","still","abhi bhi","ابھی بھی","bar bar","بار بار","continue","doesn't stop","nahi ruk","نہیں رک"]);
+    if (learned && fastState.lastLearnedAnswerId !== learned.question){
+      fastState.lastLearnedAnswerId = learned.question;
+      fastState.lastAnswerKey = "learned:" + learned.question;
+      fastState.learnedHits = (fastState.learnedHits||0)+1;
+      console.log(`[learned-answer] HIT ${learned._score.toFixed(2)} overlap=${(learned._overlap||0).toFixed(2)}: ${rawText}`);
+      return fastSpeakResponse(learned.answer, "learned_side_effect", {userText:rawText, source:"LEARNED_DB"}), true;
+    }
+    if (nuanced && !(fastState.sideEffectCounts && fastState.sideEffectCounts[symptom||"general"])){
+      fastState.pendingIntent = wantsMedicine ? "side_effect_medicine" : "side_effect_help";
+      return false;
+    }
+
+    const line = progressiveSideEffectAnswerFast(symptom, wantsMedicine);
+    fastState.lastAnswerKey = `${wantsMedicine ? "side_effect_medicine" : "side_effect_help"}:${symptom||"general"}:${fastState.sideEffectCounts[symptom||"general"]||0}`;
+    return fastSpeakResponse(line, wantsMedicine ? "side_effect_medicine" : "side_effect_help", {userText:rawText}), true;
+  }
+  // If it is not clearly unrelated, assume it is a continuation of the Extor
+  // call. Known questions stay on the instant path; unusual questions go to
+  // Claude with Extor-only instructions instead of being incorrectly blocked.
+  fastState.pendingIntent=intent;
+  fastState.requestedStrength=detectStrengthFast(t) || fastState.requestedStrength;
+  fastState.purchase = intent === "purchase";
+
+  // Onboarding has already established prescription status before this point.
+  // Patient-specific use and purchase remain protected by verified prescription;
+  // normal Extor education is available only after the verified onboarding flow.
+  const personalUse = hasAnyFast(t,["should i take","can i take","kya main le","کیا میں لے","meri dose","میری خوراک","mere liye","میرے لیے","start kar","شروع کروں"]);
+  const requiresPrescription = intent === "purchase" || personalUse;
+  if (requiresPrescription && fastState.prescription === "unknown"){
+    fastState.awaiting="prescription";
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_prescription, intent, {userText:rawText}), true;
+  }
+  if (requiresPrescription && fastState.prescription === "yes_unverified"){
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_photo, "prescription_photo", {userText:rawText, requestPhoto:true}), true;
+  }
+  if (requiresPrescription && fastState.prescription === "none"){
+    fastState.awaiting="prescription_blocked";
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.no_prescription_stop, "prescription_required", {userText:rawText}), true;
+  }
+
+  if (intent === "purchase"){
+    fastState.awaiting="store_area";
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_store_area, intent, {userText:rawText}), true;
+  }
+  if (intent === "price"){
+    fastState.lastAnswerKey = "price:" + (detectStrengthFast(t) || "all");
+    fastState.lastIntent = "price";
+    return fastSpeakResponse(priceAnswerFast(t), "price", {userText:rawText}), true;
+  }
+  if (intent === "competitor"){
+    fastState.lastAnswerKey = "competitor";
+    fastState.lastIntent = "competitor";
+    return fastSpeakResponse(competitorAnswerFast(t), "competitor", {userText:rawText}), true;
+  }
+  if (intent === "strengths"){
+    const st = detectStrengthFast(t) || "all";
+    fastState.lastAnswerKey = "strengths:" + st;
+    fastState.lastIntent = "strengths";
+    return fastSpeakResponse(strengthAnswerFast(rawText), "strengths", {userText:rawText}), true;
+  }
+  if (FAST_EXTOR_ANSWERS[intent]){
+    // Do not read the same informational answer twice in one call.
+    if (fastState.lastAnswerKey === intent){
+      const follow = intent === "other_medicines" || intent === "side_effect_medicine"
+        ? FAST_EXTOR_ANSWERS.side_effect_medicine_followup
+        : "جی، یہ بات ہم کور کر چکے ہیں؛ اگر اسی بارے میں کوئی خاص سوال ہے تو بتا دیجیے۔";
+      return fastSpeakResponse(follow, intent + "_followup", {userText:rawText}), true;
+    }
+    fastState.lastAnswerKey = intent;
+    fastState.lastIntent = intent;
+    if (intent === "side_effects") fastState.lastSideEffect = null;
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS[intent], intent, {userText:rawText}), true;
+  }
+
+  // Unknown but clearly Extor-related: reuse a previously learned Claude
+  // answer when the new question is genuinely similar; otherwise ask Claude.
+  const cachedUnknown = findLearnedAnswerFast(rawText, "unknown_extor");
+  if (cachedUnknown && fastState.lastLearnedAnswerId !== cachedUnknown.question){
+    fastState.lastLearnedAnswerId = cachedUnknown.question;
+    fastState.learnedHits = (fastState.learnedHits||0)+1;
+    console.log(`[learned-answer] HIT ${cachedUnknown._score.toFixed(2)} overlap=${(cachedUnknown._overlap||0).toFixed(2)}: ${rawText}`);
+    return fastSpeakResponse(cachedUnknown.answer, "learned_other_extor", {userText:rawText, source:"LEARNED_DB"}), true;
+  }
+  await logLearningFast(rawText, "unknown_extor", false, true, null, "CLAUDE_REQUEST");
+  return false;
+}
+
+const el = (id)=>document.getElementById(id);
+const avatar = el("avatar");
+const micBtn = el("micBtn");
+const micHint = el("micHint");
+const callStatus = el("callStatus");
+const liveCaption = el("liveCaption");
+const statusFlash = el("statusFlash");
+const debugPanel = el("debugPanel");
+
+/* ---------- transient status flash (NOT a chat transcript) ---------- */
+let flashTimeout = null;
+function flashStatus(text, ms){
+  statusFlash.textContent = text;
+  statusFlash.classList.add("show");
+  clearTimeout(flashTimeout);
+  flashTimeout = setTimeout(()=> statusFlash.classList.remove("show"), ms || 3500);
+}
+
+/* ---------- debug panel (hidden by default — toggle with the gear icon) ---------- */
+el("debugToggle").addEventListener("click", ()=>{
+  debugPanel.classList.toggle("show");
+});
+function renderDebug(s){
+  if (!s) return;
+  let html = "";
+  const row = (k,v)=> `<div class="row"><span>${k}</span><span>${v||"—"}</span></div>`;
+  html += row("Customer", s.name);
+  html += row("Intent", s.intent);
+  html += row("Mode", s.mode);
+  if (s.symptoms && s.symptoms.length) html += row("Symptoms", s.symptoms.join(", "));
+  if (s.confidence) html += row("Confidence", s.confidence);
+  if (s.matched_medicine_id) html += row("Matched OTC", s.matched_medicine_id);
+  if (s.drug_info_id) html += row("Drug info", s.drug_info_id);
+  if (s.escalation) html += row("Escalation", "⚠ " + (s.suggested_specialty || "yes"));
+  debugPanel.innerHTML = html;
+}
+
+/* ---------- speech setup ---------- */
+function pickUrduVoice(){
+  const voices = speechSynthesis.getVoices();
+  urduVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("ur")) || null;
+}
+if ("speechSynthesis" in window){
+  speechSynthesis.onvoiceschanged = pickUrduVoice;
+  pickUrduVoice();
+}
+
+let noVoiceWarned = false;
+let ttsAvailable = null;
+
+async function checkTTSAvailable(){
+  if (ttsAvailable !== null) return ttsAvailable;
+  try{
+    const r = await fetch(apiUrl("/healthz"));
+    const data = await r.json();
+    ttsAvailable = !!(data.hasUpliftKey || data.hasSonioxKey);
+  }catch(e){
+    ttsAvailable = false;
+  }
+  return ttsAvailable;
+}
+
+function speakBrowserFallback(text, onDone, tone){
+  if (!("speechSynthesis" in window) || !urduVoice){
+    if (!noVoiceWarned){
+      noVoiceWarned = true;
+      flashStatus("No Urdu voice on this device — set SONIOX_API_KEY on the server to fix this.", 5000);
+    }
+    onDone && onDone();
+    return;
+  }
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = urduVoice.lang;
+  utt.voice = urduVoice;
+  if (tone === "empathetic"){ utt.rate = 0.85; utt.pitch = 0.92; }
+  else { utt.rate = 0.98; utt.pitch = 1.0; }
+  avatar.classList.add("speaking");
+  el("avatarEmoji").textContent = "🗣️";
+  startWaveLoop(true); // simulated — Web Speech API doesn't expose real audio data to analyze
+  utt.onend = ()=>{
+    avatar.classList.remove("speaking");
+    el("avatarEmoji").textContent = "🎧";
+    stopWaveLoop();
+    lastAgentAudioEndedAt = performance.now();
+    onDone && onDone();
+  };
+  speechSynthesis.speak(utt);
+}
+
+/* ---------- audio-reactive waveform ---------- */
+let audioCtx = null;
+let analyser = null;
+let waveAnimating = false;
+const waveCanvas = el("waveCanvas");
+const waveCtx = waveCanvas.getContext("2d");
+
+function getAudioAnalyser(){
+  if (!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 128; // small = chunkier, more responsive bars
+    analyser.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return analyser;
+}
+
+// Routes an <audio> element's output through the analyser (for real waveform
+// data) while still playing it out loud normally — connecting to Web Audio
+// reroutes output, so we must reconnect to destination via the analyser or
+// the audio would go silent.
+function attachAnalyser(audioEl){
+  try{
+    const a = getAudioAnalyser();
+    const source = audioCtx.createMediaElementSource(audioEl);
+    source.connect(a);
+    return true;
+  }catch(e){
+    return false; // e.g. browser restriction — waveform just won't animate for this clip
+  }
+}
+
+function startWaveLoop(simulated){
+  if (waveAnimating) return;
+  waveAnimating = true;
+  const barCount = 24;
+  const data = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+
+  function draw(){
+    if (!waveAnimating) return;
+    requestAnimationFrame(draw);
+    const w = waveCanvas.width, h = waveCanvas.height;
+    waveCtx.clearRect(0, 0, w, h);
+    const barWidth = w / barCount;
+
+    if (!simulated && analyser){
+      analyser.getByteFrequencyData(data);
+    }
+
+    for (let i = 0; i < barCount; i++){
+      let val;
+      if (simulated || !analyser){
+        // No real audio graph available (browser-TTS fallback) — a gentle
+        // randomized pulse so the UI doesn't look broken, not real data.
+        val = 0.25 + Math.random() * 0.5;
+      } else {
+        const idx = Math.floor((i * data.length) / barCount);
+        val = data[idx] / 255;
+      }
+      const barHeight = Math.max(3, val * h);
+      const x = i * barWidth + barWidth * 0.22;
+      const y = (h - barHeight) / 2;
+      waveCtx.fillStyle = `rgba(93,138,189,${0.38 + val * 0.56})`;
+      waveCtx.fillRect(x, y, barWidth * 0.56, barHeight);
+    }
+  }
+  draw();
+}
+
+function stopWaveLoop(){
+  waveAnimating = false;
+  waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+}
+
+let currentAudioEl = null;
+let speechTurnSerial = 0;
+const prefetchedTTS = new Map();
+
+async function prefetchTTS(text, tone="normal"){
+  if (!text || prefetchedTTS.has(text)) return;
+  try{
+    const params = new URLSearchParams({ text, tone, callId: "prefetch" });
+    const r = await fetch(apiUrl("/api/tts?") + params.toString(), { cache:"force-cache" });
+    if (!r.ok) return;
+    const blob = await r.blob();
+    if (blob.size){
+      prefetchedTTS.set(text, URL.createObjectURL(blob));
+      ttsAvailable = true;
+    }
+  }catch(e){}
+}
+
+setTimeout(()=>{
+  prefetchTTS(FAST_EXTOR_ANSWERS.ask_name);
+  prefetchTTS(FAST_EXTOR_ANSWERS.ask_help);
+  prefetchTTS(FAST_EXTOR_ANSWERS.off_topic);
+  prefetchTTS(FAST_EXTOR_ANSWERS.ask_prescription);
+  prefetchTTS(FAST_EXTOR_ANSWERS.ask_weight);
+  prefetchTTS(FAST_EXTOR_ANSWERS.ask_bp);
+  prefetchTTS(FAST_EXTOR_ANSWERS.weight_unknown_ack);
+  prefetchTTS(FAST_EXTOR_ANSWERS.bp_unknown_ack);
+}, 50);
+
+function speak(text, onDone, tone){
+  lastAgentSpokenText = String(text || "").trim();
+  pauseListening(); // stop sending mic audio the instant the agent starts talking
+  const mySpeechTurn = ++speechTurnSerial;
+  return new Promise(async (resolve)=>{
+    const done = ()=>{
+      if (mySpeechTurn !== speechTurnSerial) { resolve(); return; }
+      onDone && onDone();
+      resolve();
+    };
+    const hasTTS = await checkTTSAvailable();
+    if (!hasTTS){ speakBrowserFallback(text, done, tone); return; }
+
+    const params = new URLSearchParams({ text, tone: tone || "normal", callId: callId || "" });
+    const remoteUrl = prefetchedTTS.get(text) || (apiUrl("/api/tts?") + params.toString());
+
+    if (currentAudioEl){ try{ currentAudioEl.pause(); }catch(e){} }
+
+    // IMPORTANT: the server already buffers the complete MP3 before returning
+    // it. Fetch the whole file into a local Blob BEFORE playback. This removes
+    // network/progressive-stream stalls during speech and makes onended the only
+    // normal handoff back to listening.
+    let objectUrl = null;
+    let audioEl = null;
+    try{
+      let playableUrl = remoteUrl;
+      if (!String(remoteUrl).startsWith("blob:")) {
+        const r = await fetch(remoteUrl, { cache:"force-cache" });
+        if (!r.ok) throw new Error("TTS HTTP " + r.status);
+        const blob = await r.blob();
+        if (!blob.size) throw new Error("TTS returned empty audio");
+        objectUrl = URL.createObjectURL(blob);
+        playableUrl = objectUrl;
+      }
+
+      audioEl = new Audio(playableUrl);
+      audioEl.preload = "auto";
+      currentAudioEl = audioEl;
+      avatar.classList.add("speaking");
+      el("avatarEmoji").textContent = "🗣️";
+      const gotRealAnalysis = attachAnalyser(audioEl);
+      startWaveLoop(!gotRealAnalysis);
+
+      let settled = false;
+      let playbackWatchdog = null;
+      let lastProgressAt = performance.now();
+      let lastTime = 0;
+
+      const cleanup = ()=>{
+        clearInterval(playbackWatchdog);
+        if (objectUrl){ try{ URL.revokeObjectURL(objectUrl); }catch(e){} objectUrl=null; }
+      };
+
+      audioEl.ontimeupdate = ()=>{
+        if (audioEl.currentTime > lastTime + 0.03){
+          lastTime = audioEl.currentTime;
+          lastProgressAt = performance.now();
+        }
+      };
+
+      audioEl.onended = ()=>{
+        if (settled) return;
+        settled = true;
+        cleanup();
+        avatar.classList.remove("speaking");
+        el("avatarEmoji").textContent = "🎧";
+        stopWaveLoop();
+        lastAgentAudioEndedAt = performance.now();
+        done();
+      };
+
+      audioEl.onerror = ()=>{
+        if (settled) return;
+        settled = true;
+        cleanup();
+        const errCode = audioEl.error ? audioEl.error.code : "unknown";
+        const errNames = {1:"aborted", 2:"network error", 3:"decode error", 4:"source not supported"};
+        console.log(`🚩 AUDIO PLAYBACK ERROR — ${errNames[errCode] || errCode} — reply text was: "${text}"`);
+        try{ audioEl.pause(); }catch(e){}
+        avatar.classList.remove("speaking");
+        stopWaveLoop();
+        speakBrowserFallback(text, done, tone);
+      };
+
+      // Native browsers can emit transient 'stalled'/'waiting' events even for
+      // valid audio. Do NOT abort on those events. Only intervene if playback
+      // has genuinely made zero progress for 25 seconds after it started.
+      playbackWatchdog = setInterval(()=>{
+        if (settled || audioEl.paused || audioEl.ended) return;
+        if (performance.now() - lastProgressAt > 25000){
+          settled = true;
+          cleanup();
+          console.log(`🚩 AUDIO PLAYBACK WATCHDOG — no progress for 25s — reply text was: "${text}"`);
+          try{ audioEl.pause(); }catch(e){}
+          avatar.classList.remove("speaking");
+          stopWaveLoop();
+          speakBrowserFallback(text, done, tone);
+        }
+      }, 2000);
+
+      await audioEl.play();
+    }catch(e){
+      if (objectUrl){ try{ URL.revokeObjectURL(objectUrl); }catch(e2){} }
+      if (audioEl){ try{ audioEl.pause(); }catch(e2){} }
+      avatar.classList.remove("speaking");
+      stopWaveLoop();
+      console.log("TTS fetch/playback failed, using browser fallback:", e.message || e);
+      speakBrowserFallback(text, done, tone);
+    }
+  });
+}
+
+/* ---------- mic / recognition with natural turn-taking ---------- */
+const LONG_SILENCE_PROMPT_MS = 30000; // total silence before agent checks in
+const POST_TTS_ECHO_GUARD_MS = 520; // keep mic muted briefly after speaker audio ends so Sania cannot hear her own acoustic tail
+
+let sttWs = null;
+let sttAudioContext = null;
+let sttProcessor = null;
+let sttSource = null;
+let sttSilentGain = null;
+let sttFinalTranscript = "";
+let sttConnected = false;
+let listeningPaused = true; // true while agent is speaking/showing camera — gates whether mic audio is actually sent
+let longSilenceTimer = null;
+// How long to wait after an endpoint signal before actually committing the
+// turn — gives room for a customer listing multiple pieces of information
+// to keep going without getting cut off between sentences.
+const ENDPOINT_GRACE_MS = 320;
+let endpointGraceTimer = null;
+let resumeListeningTimer = null;
+let lastAgentAudioEndedAt = 0;
+let listeningStartedAt = 0;
+let utteranceFirstTokenAt = 0;
+let utteranceLastTokenAt = 0;
+const MIN_UTTERANCE_ACTIVE_MS = 520;
+const MIN_POST_TOKEN_SETTLE_MS = 260;
+const IGNORE_TINY_UTTERANCE_CHARS = 1;
+// Local microphone VAD guard: Soniox can emit <end> in the middle of a natural
+// Urdu pause. We only commit after the *microphone itself* has also been quiet.
+const MIC_VOICE_RMS_THRESHOLD = 0.010;
+const MIC_QUIET_COMMIT_MS = 620;
+const NAME_MIC_QUIET_COMMIT_MS = 900;
+const MAX_ENDPOINT_HOLD_MS = 1800;
+let lastMicVoiceAt = 0;
+let endpointFirstSeenAt = 0;
+let freshVoiceSeenAt = 0;
+let lastAgentSpokenText = "";
+const ECHO_TRANSCRIPT_WINDOW_MS = 5000;
+
+// Opens ONE Soniox STT connection for the whole call (not per-utterance) —
+// Soniox's own endpoint detection tells us turn-by-turn when the customer
+// stopped talking, replacing our old homemade silence timer entirely.
+let sttConnectionGeneration = 0;
+let sttReconnectTimer = null;
+let sttReconnectAttempts = 0;
+let sttReconnectInProgress = false;
+const STT_MAX_RECONNECT_ATTEMPTS = 4;
+let sttHeartbeatTimer = null;
+let lastServerKeepaliveAt = 0;
+const STT_HEARTBEAT_MS = 15000;
+
+function stopSTTHeartbeat(){
+  clearInterval(sttHeartbeatTimer);
+  sttHeartbeatTimer = null;
+}
+
+function startSTTHeartbeat(localWs, generation){
+  stopSTTHeartbeat();
+  lastServerKeepaliveAt = Date.now();
+  sttHeartbeatTimer = setInterval(()=>{
+    if (!callActive || generation !== sttConnectionGeneration || localWs !== sttWs){
+      stopSTTHeartbeat();
+      return;
+    }
+    if (localWs.readyState !== WebSocket.OPEN) return;
+    try{
+      localWs.send(JSON.stringify({ type:"client_keepalive", ts:Date.now() }));
+    }catch(e){}
+  }, STT_HEARTBEAT_MS);
+}
+
+function cleanupSTTAudioChain(){
+  if (sttProcessor){ try{ sttProcessor.disconnect(); }catch(e){} sttProcessor = null; }
+  if (sttSilentGain){ try{ sttSilentGain.disconnect(); }catch(e){} sttSilentGain = null; }
+  if (sttSource){ try{ sttSource.disconnect(); }catch(e){} sttSource = null; }
+  if (sttAudioContext){ try{ sttAudioContext.close(); }catch(e){} sttAudioContext = null; }
+}
+
+function scheduleSTTReconnect(){
+  if (!callActive || sttReconnectInProgress || sttReconnectTimer) return;
+
+  if (sttReconnectAttempts >= STT_MAX_RECONNECT_ATTEMPTS){
+    sttConnected = false;
+    micBtn.classList.remove("listening");
+    avatar.classList.remove("listening");
+    micHint.textContent = "listening unavailable";
+    callStatus.textContent = "Listening offline";
+    flashStatus("Listening could not reconnect. Please end the call and start again.", 7000);
+    return;
+  }
+
+  const reconnectDelays = [2000, 5000, 10000, 20000];
+  const delay = reconnectDelays[Math.min(sttReconnectAttempts, reconnectDelays.length - 1)];
+  sttReconnectAttempts += 1;
+  // Brief network hiccups should feel like a phone call, not a debug console.
+  // Recover silently for the first two attempts; only surface a message if
+  // the outage is lasting long enough that the customer should know.
+  if (sttReconnectAttempts >= 3){
+    flashStatus(`Listening is reconnecting (${sttReconnectAttempts}/${STT_MAX_RECONNECT_ATTEMPTS})...`, Math.max(2500, delay + 800));
+  }
+
+  sttReconnectTimer = setTimeout(async ()=>{
+    sttReconnectTimer = null;
+    if (!callActive) return;
+    sttReconnectInProgress = true;
+    const ok = await connectSTT(true);
+    sttReconnectInProgress = false;
+    if (ok){
+      const recoveredAfter = sttReconnectAttempts;
+      sttReconnectAttempts = 0;
+      if (recoveredAfter >= 3) flashStatus("Listening reconnected", 1800);
+      startListening();
+    } else if (callActive){
+      scheduleSTTReconnect();
+    }
+  }, delay);
+}
+
+// Opens ONE Soniox STT connection for the whole call. Reconnects are guarded
+// by a generation id so a stale socket can never spawn a second reconnect
+// after a newer connection has already replaced it.
+function connectSTT(isReconnect = false){
+  return new Promise((resolve)=>{
+    const generation = ++sttConnectionGeneration;
+    cleanupSTTAudioChain();
+
+    // Explicitly retire any previous browser->server socket before replacing it.
+    const previousWs = sttWs;
+    if (previousWs){
+      try{ previousWs.onclose = null; previousWs.onerror = null; previousWs.close(); }catch(e){}
+    }
+
+    const localWs = new WebSocket(backendWsUrl(`/ws/stt?callId=${encodeURIComponent(callId)}`));
+    sttWs = localWs;
+    localWs.binaryType = "arraybuffer";
+    let promiseSettled = false;
+
+    const settle = (value)=>{
+      if (promiseSettled) return;
+      promiseSettled = true;
+      resolve(value);
+    };
+
+    localWs.onopen = async ()=>{
+      // If another connection superseded this one while it was opening,
+      // immediately retire this stale socket.
+      if (generation !== sttConnectionGeneration || localWs !== sttWs){
+        try{ localWs.close(); }catch(e){}
+        return settle(false);
+      }
+      try{
+        sttAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        sttSource = sttAudioContext.createMediaStreamSource(micStream);
+        sttProcessor = sttAudioContext.createScriptProcessor(4096, 1, 1);
+        sttSilentGain = sttAudioContext.createGain();
+        sttSilentGain.gain.value = 0;
+        sttSource.connect(sttProcessor);
+        sttProcessor.connect(sttSilentGain);
+        sttSilentGain.connect(sttAudioContext.destination);
+
+        sttProcessor.onaudioprocess = (e)=>{
+          if (generation !== sttConnectionGeneration || localWs !== sttWs) return;
+          if (listeningPaused) return;
+          if (localWs.readyState !== WebSocket.OPEN) return;
+          const input = e.inputBuffer.getChannelData(0);
+          // Lightweight local voice-activity check. This does not transcribe
+          // anything; it only prevents a semantic Soniox endpoint from closing
+          // the mic while the caller is still audibly speaking.
+          let energy = 0;
+          for (let i = 0; i < input.length; i++) energy += input[i] * input[i];
+          const rms = Math.sqrt(energy / Math.max(1, input.length));
+          if (rms > MIC_VOICE_RMS_THRESHOLD){
+            lastMicVoiceAt = performance.now();
+            if (!freshVoiceSeenAt && listeningStartedAt) freshVoiceSeenAt = performance.now();
+          }
+          const pcm16 = new Int16Array(input.length);
+          for (let i = 0; i < input.length; i++){
+            const s = Math.max(-1, Math.min(1, input[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          try{ localWs.send(pcm16.buffer); }catch(e){}
+        };
+
+        sttConnected = true;
+        if (!isReconnect) sttReconnectAttempts = 0;
+        startSTTHeartbeat(localWs, generation);
+        resetLongSilenceTimer();
+        settle(true);
+      }catch(err){
+        sttConnected = false;
+        flashStatus("Mic audio setup failed: " + err.message, 5000);
+        settle(false);
+      }
+    };
+
+    localWs.onmessage = (event)=>{
+      if (generation !== sttConnectionGeneration || localWs !== sttWs) return;
+      let msg;
+      try{ msg = JSON.parse(event.data); }catch(e){ return; }
+      if (msg && msg.type === "server_keepalive"){
+        lastServerKeepaliveAt = Date.now();
+        return;
+      }
+      if (!msg.tokens) return;
+      if (listeningPaused) return;
+      // Do not throw away Soniox final tokens just because the browser VAD missed
+      // a very short reply such as "yes, I have". We still require fresh voice
+      // for normal conversation at commit time, but strict onboarding replies
+      // can be accepted from their semantic content.
+
+      for (const tok of msg.tokens){
+        if (!tok.is_final) continue;
+        if (tok.text === "<end>"){
+          resetLongSilenceTimer();
+          clearTimeout(endpointGraceTimer);
+          const now = performance.now();
+          if (!endpointFirstSeenAt) endpointFirstSeenAt = now;
+
+          const tryCommit = ()=>{
+            if (generation !== sttConnectionGeneration || localWs !== sttWs) return;
+            if (listeningPaused) return;
+            const now2 = performance.now();
+            const activeFor = utteranceFirstTokenAt ? (now2 - utteranceFirstTokenAt) : 0;
+            const sinceLastToken = utteranceLastTokenAt ? (now2 - utteranceLastTokenAt) : 9999;
+            const sinceMicVoice = lastMicVoiceAt ? (now2 - lastMicVoiceAt) : 9999;
+            const endpointHeld = endpointFirstSeenAt ? (now2 - endpointFirstSeenAt) : 0;
+
+            const shortOnboardingStage = ["prescription","prescription_blocked","weight","bp"].includes(fastState.awaiting);
+            const minActiveNeeded = shortOnboardingStage ? 220 : MIN_UTTERANCE_ACTIVE_MS;
+            const stillTooShort = activeFor < minActiveNeeded;
+            const tokenStillFresh = sinceLastToken < MIN_POST_TOKEN_SETTLE_MS;
+            const quietNeeded = (fastState.awaiting === "name") ? NAME_MIC_QUIET_COMMIT_MS : (shortOnboardingStage ? 380 : MIC_QUIET_COMMIT_MS);
+            const callerStillAudible = sinceMicVoice < quietNeeded;
+
+            // The max hold is a safety valve only. Under normal speech, commit
+            // happens after actual microphone voice activity ends (about 900ms for the
+            // short name turn, 620ms for normal Extor conversation).
+            if ((stillTooShort || tokenStillFresh || callerStillAudible) && endpointHeld < MAX_ENDPOINT_HOLD_MS){
+              endpointGraceTimer = setTimeout(tryCommit, 90);
+              return;
+            }
+
+            const committedText = sttFinalTranscript.trim();
+            sttFinalTranscript = "";
+            utteranceFirstTokenAt = 0;
+            utteranceLastTokenAt = 0;
+            endpointFirstSeenAt = 0;
+            if (committedText.length > IGNORE_TINY_UTTERANCE_CHARS){
+              // Browser VAD can miss extremely short replies. During the strict
+              // onboarding slots, accept a transcript without local VAD only when
+              // its meaning is unambiguous for the slot. This fixes "yes, I have"
+              // not advancing the prescription flow while still rejecting random
+              // delayed/echo text.
+              if (!freshVoiceSeenAt){
+                const stage = fastState.awaiting;
+                const clearPrescription = ["prescription","prescription_blocked"].includes(stage) && (prescriptionNowAvailableFast(committedText) || isNoFast(committedText));
+                const clearWeight = stage === "weight" && (extractWeightFast(committedText) != null || isUnknownVitalFast(committedText));
+                const clearBp = stage === "bp" && (extractBpFast(committedText) != null || isUnknownVitalFast(committedText) || isNoFast(committedText));
+                if (!(clearPrescription || clearWeight || clearBp)){
+                  console.log(`[turn-guard] DROPPED_NO_FRESH_VOICE: ${committedText}`);
+                  sttFinalTranscript = "";
+                  utteranceFirstTokenAt = 0;
+                  utteranceLastTokenAt = 0;
+                  endpointFirstSeenAt = 0;
+                  return;
+                }
+                console.log(`[turn-guard] ACCEPTED_SHORT_ONBOARDING_REPLY stage=${stage}: ${committedText}`);
+              }
+              if (isLikelyAgentEchoTranscript(committedText)){
+                console.log(`[turn-guard] DROPPED_AGENT_ECHO: ${committedText}`);
+                sttFinalTranscript = "";
+                utteranceFirstTokenAt = 0;
+                utteranceLastTokenAt = 0;
+                endpointFirstSeenAt = 0;
+                freshVoiceSeenAt = 0;
+                return;
+              }
+              const normCommitted = normFast(committedText);
+              const nowCommit = performance.now();
+              if (normCommitted && lastCommittedTranscript === normCommitted && (nowCommit - lastCommittedTranscriptAt) < 8000){
+                console.log(`[turn-guard] DROPPED_DUPLICATE_TRANSCRIPT: ${committedText}`);
+                freshVoiceSeenAt = 0;
+                return;
+              }
+              lastCommittedTranscript = normCommitted;
+              lastCommittedTranscriptAt = nowCommit;
+              pauseListening();
+              handleUserUtterance(committedText);
+            }
+          };
+
+          endpointGraceTimer = setTimeout(tryCommit, ENDPOINT_GRACE_MS);
+        } else {
+          clearTimeout(endpointGraceTimer);
+          endpointFirstSeenAt = 0;
+          if (!utteranceFirstTokenAt) utteranceFirstTokenAt = performance.now();
+          utteranceLastTokenAt = performance.now();
+          sttFinalTranscript += tok.text;
+          resetLongSilenceTimer();
+        }
+      }
+    };
+
+    localWs.onerror = ()=>{
+      if (generation !== sttConnectionGeneration || localWs !== sttWs) return;
+      sttConnected = false;
+      settle(false);
+      // onclose normally follows; reconnect is scheduled there so we only
+      // have one recovery path.
+    };
+
+    localWs.onclose = ()=>{
+      // Ignore close events from stale/replaced sockets. This was the main
+      // cause of overlapping reconnect loops in the previous build.
+      if (generation !== sttConnectionGeneration || localWs !== sttWs) return;
+      sttConnected = false;
+      sttWs = null;
+      stopSTTHeartbeat();
+      cleanupSTTAudioChain();
+      settle(false);
+      if (callActive) scheduleSTTReconnect();
+    };
+  });
+}
+
+function isLikelyAgentEchoTranscript(text){
+  const age = performance.now() - lastAgentAudioEndedAt;
+  if (!lastAgentSpokenText || !lastAgentAudioEndedAt || age > ECHO_TRANSCRIPT_WINDOW_MS) return false;
+  const norm = (v)=>String(v||"").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim();
+  const a=norm(text), b=norm(lastAgentSpokenText);
+  if (!a || !b) return false;
+  if ((a.length >= 8 && b.includes(a)) || (b.length >= 8 && a.includes(b))) return true;
+  const A=new Set(a.split(/\s+/).filter(x=>x.length>1));
+  const B=new Set(b.split(/\s+/).filter(x=>x.length>1));
+  if (!A.size || !B.size) return false;
+  let overlap=0; for (const w of A) if (B.has(w)) overlap++;
+  return overlap / Math.min(A.size,B.size) >= 0.45;
+}
+
+function resetLongSilenceTimer(){
+  clearTimeout(longSilenceTimer);
+  if (listeningPaused) return; // don't even schedule this while the agent is speaking
+  longSilenceTimer = setTimeout(()=>{
+    if (!sttFinalTranscript.trim() && callActive && !listeningPaused){
+      askAreYouThere();
+    }
+  }, LONG_SILENCE_PROMPT_MS);
+}
+
+async function askAreYouThere(){
+  // This is ONLY a presence check; it must never mutate or restart onboarding.
+  // Preserve the exact stage across the prompt (prescription/weight/BP/general).
+  if (listeningPaused || processingReply) return;
+  const preservedAwaiting = fastState.awaiting;
+  const preservedPrescription = fastState.prescription;
+  const preservedOnboardingComplete = fastState.onboardingComplete;
+  const line = "کیا آپ وہاں ہیں؟";
+  console.log(`[presence-check] stage=${preservedAwaiting || "general"} prescription=${preservedPrescription}`);
+  await speak(line, null, "normal");
+  fastState.awaiting = preservedAwaiting;
+  fastState.prescription = preservedPrescription;
+  fastState.onboardingComplete = preservedOnboardingComplete;
+  startListening();
+}
+
+// Unpauses mic audio sending — Soniox's own endpoint detection then decides
+// when the customer is done talking, no manual start/stop per turn needed.
+function startListening(){
+  if (!callActive || !sttConnected) return;
+  // A new listening phase is a hard turn boundary: there must never be a
+  // delayed continuation from the previous answer after this point.
+  if (currentAudioEl && currentAudioEl.ended) currentAudioEl = null;
+
+  // Never open the microphone while agent audio is still playing.
+  if (avatar.classList.contains("speaking")) return;
+  if (currentAudioEl && !currentAudioEl.paused && !currentAudioEl.ended) return;
+
+  // Acoustic echo cancellation is not instantaneous on every phone/laptop.
+  // Keep the mic gated for a short tail after TTS finishes so the final words
+  // from the speakers cannot be transcribed as a brand-new customer turn.
+  const elapsed = performance.now() - lastAgentAudioEndedAt;
+  const waitMs = Math.max(0, POST_TTS_ECHO_GUARD_MS - elapsed);
+  if (lastAgentAudioEndedAt && waitMs > 0){
+    clearTimeout(resumeListeningTimer);
+    micHint.textContent = "ایک لمحہ...";
+    resumeListeningTimer = setTimeout(()=>{
+      resumeListeningTimer = null;
+      startListening();
+    }, waitMs);
+    return;
+  }
+
+  clearTimeout(resumeListeningTimer);
+  resumeListeningTimer = null;
+  // A paused period can still leave delayed Soniox finals in flight. Never
+  // carry partial text from before/while Sania was speaking into a new turn.
+  sttFinalTranscript = "";
+  utteranceFirstTokenAt = 0;
+  utteranceLastTokenAt = 0;
+  endpointFirstSeenAt = 0;
+  lastMicVoiceAt = 0;
+  freshVoiceSeenAt = 0;
+  listeningStartedAt = performance.now();
+  listeningPaused = false;
+  micBtn.classList.add("listening");
+  avatar.classList.add("listening");
+  micHint.textContent = "سن رہی ہوں...";
+  callStatus.textContent = "Live — listening";
+  resetLongSilenceTimer();
+}
+
+function pauseListening(){
+  listeningPaused = true;
+  clearTimeout(resumeListeningTimer);
+  resumeListeningTimer = null;
+  micBtn.classList.remove("listening");
+  avatar.classList.remove("listening");
+  clearTimeout(longSilenceTimer);
+  clearTimeout(endpointGraceTimer);
+  // Drop any incomplete pre-pause transcription. This prevents a late <end>
+  // from turning old audio into a phantom customer message after TTS.
+  sttFinalTranscript = "";
+  utteranceFirstTokenAt = 0;
+  utteranceLastTokenAt = 0;
+  endpointFirstSeenAt = 0;
+  lastMicVoiceAt = 0;
+  freshVoiceSeenAt = 0;
+}
+
+/* ---------- camera (prescription photo) ---------- */
+let cameraStream = null;
+async function requestCameraPermission(){
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    return true;
+  }catch(e){
+    flashStatus("Camera permission not granted — prescription photos won't be available.", 5000);
+    return false;
+  }
+}
+
+async function openCameraForPrescription(){
+  pauseListening();
+  if (!cameraStream){
+    const ok = await requestCameraPermission();
+    if (!ok){
+      fastState.prescription = "none";
+      fastState.afterVitals = null;
+      fastState.awaiting = "prescription_blocked";
+      await fastSpeakResponse(FAST_EXTOR_ANSWERS.no_prescription_stop, "camera_unavailable_prescription_required", { userText:"" });
+      return;
+    }
+  }
+  const video = el("cameraVideo");
+  video.srcObject = cameraStream;
+  el("cameraOverlay").classList.add("active");
+  micHint.textContent = "نسخہ دکھائیے...";
+}
+
+function closeCameraOverlay(){
+  el("cameraOverlay").classList.remove("active");
+}
+
+el("captureBtn").addEventListener("click", ()=>{
+  // A prescription snapshot is a NEW caller/system turn. The previous spoken
+  // "yes, I have it" turn has already committed one response, so reusing that
+  // turn id would make the single-turn guard correctly (but undesirably) drop
+  // the camera verification as a duplicate response.
+  userTurnSerial += 1;
+  responseCommittedTurn = 0;
+  console.log(`[camera] SNAPSHOT_SUBMITTED turn=${userTurnSerial} previousPrescription=${fastState.prescription}`);
+  const video = el("cameraVideo");
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 720;
+  canvas.height = video.videoHeight || 960;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  const base64 = dataUrl.split(",")[1];
+  closeCameraOverlay();
+  flashStatus("Photo captured — sending to agent...", 2500);
+  callClaude([
+    { type:"image", source:{ type:"base64", media_type:"image/jpeg", data: base64 } },
+    { type:"text", text:"یہ میرے ڈاکٹر کا نسخہ ہے، براہِ کرم دیکھیں۔" }
+  ]);
+});
+
+el("cameraCancelBtn").addEventListener("click", async ()=>{
+  closeCameraOverlay();
+  fastState.prescription = "none";
+  fastState.afterVitals = null;
+  fastState.awaiting = "prescription_blocked";
+  await fastSpeakResponse(FAST_EXTOR_ANSWERS.no_prescription_stop, "prescription_cancelled_required", {userText:""});
+});
+
+/* ---------- conversation flow (streaming) ---------- */
+
+let processingReply = false;
+async function callClaude(userContent){
+  if (processingReply){
+    // A reply is already in flight — this call is almost certainly the mic
+    // picking up the agent's own voice as new input (feedback loop), or a
+    // duplicate trigger. Drop it silently rather than stacking replies.
+    return;
+  }
+  processingReply = true;
+  const turnId = userTurnSerial;
+  if (turnId && responseCommittedTurn === turnId){
+    console.log(`[turn-lock] DROPPED_SECOND_CLAUDE_RESPONSE turn=${turnId}`);
+    processingReply = false;
+    startListening();
+    return;
+  }
+
+  messages.push({ role:"user", content:userContent });
+  micBtn.disabled = true;
+  micHint.textContent = "ایک لمحہ...";
+  liveCaption.textContent = "";
+
+  let fullText = "";
+  let speakBuffer = ""; // accumulates the spoken portion (everything before <state>)
+  let inState = false;
+
+  try{
+    const response = await fetch(apiUrl("/api/chat-stream"), {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        system: buildSystemPrompt() + `\n\nCURRENT LOCAL CALL STATE: ${JSON.stringify({name:fastState.name,prescription:fastState.prescription,weightKg:fastState.weightKg,usualBp:fastState.usualBp,onboardingComplete:fastState.onboardingComplete,lastIntent:fastState.lastIntent})}\nInterpret ONLY the newest caller utterance. Verify the WHOLE utterance before choosing an intent. Answer ONLY what that complete newest utterance asks. Never answer a previous, pending, implied, or related question unless the caller explicitly asks it now. Do not continue prose from an earlier assistant answer. If the newest question is ambiguous, ask ONE short clarification instead of guessing. Keep the spoken answer to one direct complete sentence whenever possible.`,
+        messages: [{ role:"user", content:userContent }]
+      })
+    });
+    if (!response.ok || !response.body){
+      let data = {};
+      try{ data = await response.json(); }catch(e){}
+      throw new Error((data && data.error && data.error.message) || ("HTTP " + response.status));
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = "";
+
+    while (true){
+      const { done, value } = await reader.read();
+      if (done) break;
+      sseBuffer += decoder.decode(value, { stream:true });
+      const events = sseBuffer.split("\n\n");
+      sseBuffer = events.pop();
+
+      for (const evt of events){
+        const dataLine = evt.split("\n").find(l => l.startsWith("data:"));
+        if (!dataLine) continue;
+        let payload;
+        try{ payload = JSON.parse(dataLine.slice(5).trim()); }catch(e){ continue; }
+
+        if (payload.type === "content_block_delta" && payload.delta && payload.delta.type === "text_delta"){
+          const t = payload.delta.text;
+          fullText += t;
+
+          if (!inState){
+            const combined = speakBuffer + t;
+            const markerIdx = combined.indexOf("<state>");
+            if (markerIdx !== -1){
+              speakBuffer = combined.slice(0, markerIdx);
+              inState = true;
+            } else {
+              speakBuffer = combined;
+            }
+          }
+        }
+      }
+    }
+
+    let stateObj = null;
+    const match = fullText.match(/<state>([\s\S]*?)<\/state>/);
+    if (match){
+      try{ stateObj = JSON.parse(match[1]); }catch(e){ stateObj = null; }
+    }
+    messages.push({ role:"assistant", content: fullText });
+    // Capture the local prescription state BEFORE applying Claude's hidden state.
+    // A newly verified camera snapshot must be detected from the transition
+    // yes_unverified -> verified; checking after sync would always read verified.
+    const prescriptionBeforeClaude = fastState.prescription;
+    if (stateObj){
+      renderDebug(stateObj);
+      syncFastStateFromClaude(stateObj);
+      // If Claude successfully classified an unusual Extor phrasing into an
+      // already-approved intent, remember only that wording. Next time the
+      // same style of question can bypass Claude and answer instantly.
+      if (typeof userContent === "string" && FAST_EXTOR_ANSWERS[stateObj.intent]){
+        logLearningFast(userContent, stateObj.intent, true, true, null, "CLAUDE");
+        learnedIntentPhrases[stateObj.intent] = learnedIntentPhrases[stateObj.intent] || [];
+        const learnedText = normFast(userContent);
+        if (learnedText && !learnedIntentPhrases[stateObj.intent].includes(learnedText)) learnedIntentPhrases[stateObj.intent].push(learnedText);
+      }
+    }
+
+    let spokenText = speakBuffer.trim();
+    // Multilingual/free-form name fallback: when the local parser cannot safely
+    // isolate a name, Claude may extract it from any language or natural word
+    // order. Do not answer any medicine question on this turn; continue the
+    // strict onboarding flow with the prescription question only.
+    if (stateObj && fastState.awaiting === "name" && stateObj.name){
+      fastState.name = String(stateObj.name).trim();
+      fastState.awaiting = "prescription";
+      fastState.pendingIntent = null;
+      spokenText = FAST_EXTOR_ANSWERS.ask_prescription;
+    }
+    let prescriptionJustVerified = false;
+    if (stateObj && stateObj.prescription_status === "verified"){
+      console.log(`[camera] VERIFICATION_RESULT verified turn=${turnId} before=${prescriptionBeforeClaude}`);
+      // A camera verification is a one-time state transition. Use the state
+      // captured BEFORE syncFastStateFromClaude(), otherwise newlyVerified is
+      // always false because sync has already set it to verified.
+      const newlyVerified = prescriptionBeforeClaude !== "verified";
+      fastState.prescription = "verified";
+      if (newlyVerified && !fastState.onboardingComplete){
+        prescriptionJustVerified = true;
+        fastState.onboardingComplete = false;
+        fastState.awaiting = "weight";
+        fastState.weightKg = null;
+        fastState.usualBp = null;
+        fastState.bpCategory = null;
+        fastState.weightAttempts = 0;
+        fastState.bpAttempts = 0;
+        fastState.pendingIntent = null;
+        spokenText = "شکریہ، نسخہ تصدیق ہو گیا ہے؛ " + FAST_EXTOR_ANSWERS.ask_weight;
+        console.log(`[onboarding] PRESCRIPTION_VERIFIED -> awaiting=weight`);
+      }
+      stateObj.request_photo = false;
+    }
+    // INTENT LOCK: once the complete question has been classified into a
+    // stable approved intent, the spoken answer must match that intent exactly.
+    // This prevents a correct `how_to_take` label from accidentally speaking a
+    // side-effect answer carried over from prior context.
+    if (!prescriptionJustVerified) spokenText = lockSpokenAnswerToIntent(spokenText, stateObj, typeof userContent === "string" ? userContent : "");
+
+    // Hard voice-length guard: even if Claude or a learned answer is verbose,
+    // keep the phone reply to one complete compact thought.
+    spokenText = compactSpokenReply(spokenText);
+    // Make the actual response source visible in the Node terminal. This is
+    // separate from learning metadata so a training call can be audited at a glance.
+    if (typeof userContent === "string" && spokenText){
+      logLearningFast(userContent, (stateObj && stateObj.intent) || fastState.pendingIntent || "other_extor", true, true, null, "CLAUDE_RESPONSE");
+    }
+    // Cache a useful, general Claude fallback answer for future similar Extor
+    // questions. This is only a speed cache; the locked medical KB itself is
+    // never rewritten.
+    if (typeof userContent === "string" && spokenText){
+      const learnedIntent = (fastState.pendingIntent && fastState.pendingIntent !== "unknown_extor") ? fastState.pendingIntent : ((stateObj && stateObj.intent) || "other_extor");
+      if (["what_is","strengths","dose_frequency","side_effect_help","side_effect_medicine","side_effects","other_medicines","timing","food","missed_dose","how_to_take","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","price","competitor","other_extor"].includes(learnedIntent)){
+        fastState.claudeLearnedThisCall = (fastState.claudeLearnedThisCall||0)+1;
+        saveLearnedAnswerFast(userContent, learnedIntent, spokenText);
+      }
+    }
+    fastState.pendingIntent = null;
+    liveCaption.textContent = spokenText;
+    const tone = (stateObj && stateObj.tone) || "normal";
+
+    // ONE continuous TTS request for the whole reply. Uplift is the primary
+    // voice; never split one answer into multiple speaking phases.
+    if (turnId) responseCommittedTurn = turnId;
+    const speakPromise = spokenText ? speak(spokenText, null, tone) : Promise.resolve();
+
+    speakPromise.then(()=>{
+      liveCaption.textContent = "";
+      if (stateObj && stateObj.request_photo && stateObj.prescription_status !== "verified"){
+        openCameraForPrescription();
+        micHint.textContent = "showing camera...";
+        processingReply = false;
+      } else if (stateObj && stateObj.closing){
+        callActive = false;
+        callStatus.textContent = "Call ended";
+        callStatus.classList.remove("live");
+        micBtn.disabled = true;
+        el("callAgainBtn").style.display = "block";
+        processingReply = false;
+      } else {
+        micBtn.disabled = false;
+        processingReply = false;
+        startListening();
+      }
+    });
+  }catch(err){
+    flashStatus("Connection error: " + err.message, 5000);
+    micBtn.disabled = false;
+    micHint.textContent = "automatic — just talk";
+    processingReply = false;
+    startListening();
+  }
+}
+
+async function handleUserUtterance(text){
+  if (processingReply) return;
+  userTurnSerial += 1;
+  responseCommittedTurn = 0;
+  console.log(`[user-turn] ${userTurnSerial}: ${text}`);
+  const handled = await tryFastExtorRoute(text);
+  if (!handled) callClaude(text);
+}
+
+/* ---------- controls ---------- */
+async function beginCall(){
+  el("startOverlay").style.display = "none";
+  el("callAgainBtn").style.display = "none";
+  callActive = true;
+  resetFastState();
+  userTurnSerial = 0;
+  responseCommittedTurn = 0;
+  lastCommittedTranscript = "";
+  lastCommittedTranscriptAt = 0;
+  refreshLearnedIntentPhrases();
+  callId = "call_" + Date.now() + "_" + Math.floor(Math.random()*100000);
+  callStatus.textContent = "Live — connecting";
+  callStatus.classList.add("live");
+
+  const greeting = FAST_EXTOR_ANSWERS.ask_name;
+  fastState.awaiting = "name";
+  liveCaption.textContent = greeting;
+  // Prime the configured server voice (Uplift in this build) before the first
+  // spoken word, so the greeting never begins with a different browser voice.
+  await prefetchTTS(greeting, "normal");
+  console.log(`[call-start] greeting voice requested via server TTS (UPLIFT primary)`);
+  const greetingPromise = speak(greeting);
+
+  let micOk = false;
+  try{
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      throw new Error("This browser/frame does not expose microphone access.");
+    }
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
+    });
+    micOk = true;
+  }catch(err){
+    flashStatus("Mic permission not granted: " + err.message, 6000);
+  }
+
+  const sttPromise = micOk ? connectSTT() : Promise.resolve(false);
+  const [, sttOk] = await Promise.all([greetingPromise, sttPromise]);
+  liveCaption.textContent = "";
+
+  micBtn.disabled = !sttOk;
+  if (!sttOk){
+    micHint.textContent = "mic blocked — see message";
+    callStatus.textContent = "Live — mic unavailable";
+  } else {
+    callStatus.textContent = "Live — listening";
+    startListening();
+  }
+}
+function teardownSTT(){
+  stopSTTHeartbeat();
+  clearTimeout(longSilenceTimer);
+  clearTimeout(endpointGraceTimer);
+  clearTimeout(resumeListeningTimer);
+  clearTimeout(sttReconnectTimer);
+  sttReconnectTimer = null;
+  sttReconnectInProgress = false;
+  sttReconnectAttempts = 0;
+  sttConnectionGeneration += 1;
+  resumeListeningTimer = null;
+  listeningPaused = true;
+  sttConnected = false;
+  if (sttWs){ try{ sttWs.close(); }catch(e){} sttWs = null; }
+  if (sttProcessor){ try{ sttProcessor.disconnect(); }catch(e){} sttProcessor = null; }
+  if (sttSilentGain){ try{ sttSilentGain.disconnect(); }catch(e){} sttSilentGain = null; }
+  if (sttSource){ try{ sttSource.disconnect(); }catch(e){} sttSource = null; }
+  if (sttAudioContext){ try{ sttAudioContext.close(); }catch(e){} sttAudioContext = null; }
+  if (micStream){ micStream.getTracks().forEach(t=>{ try{ t.stop(); }catch(e){} }); micStream = null; }
+  sttFinalTranscript = "";
+}
+
+function resetCallState(){
+  messages = [];
+  resetFastState();
+  liveCaption.textContent = "";
+  debugPanel.innerHTML = "";
+  if (currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
+  speechSynthesis.cancel();
+  teardownSTT();
+}
+
+el("startBtn").addEventListener("click", beginCall);
+
+el("callAgainBtn").addEventListener("click", ()=>{
+  resetCallState();
+  beginCall();
+});
+
+micBtn.addEventListener("click", ()=>{
+  startListening();
+});
+
+function endCall(){
+  callActive = false;
+  callStatus.textContent = "Call ended";
+  callStatus.classList.remove("live");
+  micBtn.disabled = true;
+  teardownSTT();
+  speechSynthesis.cancel();
+  if (currentAudioEl){ try{ currentAudioEl.pause(); }catch(e){} }
+  flashStatus("Call ended", 2000);
+  el("callAgainBtn").style.display = "block";
+}
+
+el("endBtn").addEventListener("click", endCall);
+</script>
+</body>
+</html>

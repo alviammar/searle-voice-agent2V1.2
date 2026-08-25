@@ -1,0 +1,29 @@
+SEARLE EXTOR - RENDER BACKEND DEPLOYMENT
+
+1) Deploy the CONTENTS of this folder to your existing Render Web Service (or push them to the GitHub repo connected to Render).
+2) Build command: npm install
+3) Start command: npm start
+4) Health check: /healthz
+
+Required Render Environment Variables:
+ANTHROPIC_API_KEY = your Claude key
+SONIOX_API_KEY    = your Soniox key
+UPLIFT_API_KEY    = your Uplift key
+
+Recommended:
+TTS_PROVIDER=uplift
+UPLIFT_TTS_VOICE=paediatrician
+UPLIFT_TTS_FORMAT=MP3_22050_128
+ENABLE_SONIOX_TTS_FALLBACK=1
+
+Optional production CORS restriction:
+CORS_ORIGIN=https://YOUR-NETLIFY-SITE.netlify.app
+(Leave unset while testing if you want the default permissive demo CORS.)
+
+After deployment verify:
+https://YOUR-RENDER-SERVICE.onrender.com/healthz
+It should report hasClaudeKey, hasSonioxKey and hasUpliftKey as true.
+
+IMPORTANT ABOUT LEARNING DATA ON RENDER:
+The app writes learning into data/learned-answers.json, data/learned-phrases.json and data/learning-events.jsonl.
+A normal ephemeral Render filesystem can lose runtime-written learning on redeploy/replacement. If you need training to survive deployments, use persistent storage or periodically download/back up the data files before redeploying.
