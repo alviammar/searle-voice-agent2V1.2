@@ -752,8 +752,11 @@ async function saveLearnedAnswerFast(question,intent,answer){
   try{
     const r=await fetch(apiUrl("/api/learn-answer"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question,intent,answer})});
     if (r.ok){
-      learnedAnswerCache = (learnedAnswerCache || []).filter(x => !(x.intent===intent && normFast(x.question)===normFast(question)));
-      learnedAnswerCache.push({question:normFast(question),intent,answer});
+      let payload={}; try{ payload=await r.json(); }catch(e){}
+      const resolvedIntent = payload.intent || intent;
+      learnedAnswerCache = (learnedAnswerCache || []).filter(x => !(x.intent===resolvedIntent && normFast(x.question)===normFast(question)));
+      learnedAnswerCache.push({question:normFast(question),intent:resolvedIntent,answer});
+      console.log(`[learning-promote] local intent=${resolvedIntent}: ${question}`);
     }
   }catch(e){}
 }
@@ -1030,6 +1033,41 @@ const INTENT_SIGNAL_RULES = {
     action:["what","why","kis","kyun","کیا","کیوں","کس"],
     context:["extor","ایکسٹور","amlodipine","valsartan","bp medicine","بلڈ پریشر کی دوا"]
   },
+  kidney_liver: {
+    topic:["kidney","kidneys","renal","گردہ","گردے","gurda","gurday","liver","hepatic","جگر","jigar"],
+    action:["safe","safety","precaution","precautions","ehtiyat","احتیاط","can i","kya main","کیا میں","issue","problem","مسئلہ"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا","tablet"]
+  },
+  pregnancy: {
+    topic:["pregnant","pregnancy","حمل","حاملہ","hamal"],
+    action:["safe","can i","kya main","کیا میں","take","lena","لینا","use","استعمال"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا"]
+  },
+  breastfeeding: {
+    topic:["breastfeed","breastfeeding","feeding baby","nursing","دودھ پلا"],
+    action:["safe","can i","take","lena","لینا","use","استعمال"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا"]
+  },
+  potassium: {
+    topic:["potassium","پوٹاشیم"],
+    action:["safe","can i","take","lena","supplement","interaction","ساتھ"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا"]
+  },
+  under18: {
+    topic:["under 18","under18","18 years","18 سال","child","children","teen","بچہ","بچوں"],
+    action:["safe","can","use","take","lena","لینا","استعمال"],
+    context:["extor","ایکسٹور","medicine","dawa","دوا"]
+  },
+  overdose: {
+    topic:["overdose","too many tablets","extra tablets","زیادہ گولیاں","زیادہ خوراک"],
+    action:["what do","what should","kya kar","کیا کر","took","لے لی","کھا لی"],
+    context:["extor","ایکسٹور","tablet","goli","گولی","dose","خوراک"]
+  },
+  emergency: {
+    topic:["chest pain","سینے میں درد","difficulty breathing","سانس","faint","fainted","بے ہوش","severe swelling","شدید سوجن"],
+    action:["what do","what should","kya kar","کیا کر","urgent","emergency","فوری"],
+    context:["extor","ایکسٹور","after taking","لینے کے بعد","medicine","دوا"]
+  },
   co_extor: {
     topic:["co-extor","co extor","کو ایکسٹور"],
     action:["difference","different","فرق","what","کیا"],
@@ -1173,6 +1211,11 @@ function detectExtorIntentFast(t){
   if (hasAnyFast(t,["with food or without food","کھانے کے ساتھ یا بغیر","empty stomach or after food"])) return "food";
   if (hasAnyFast(t,["when should i take extor","what time should i take extor","ایکسٹور کس وقت لوں","ایکسٹور کب لوں"])) return "timing";
   if (hasAnyFast(t,["how should i take extor","how to take extor","ایکسٹور کیسے لوں"])) return "how_to_take";
+  if (hasAnyFast(t,["kidney","kidneys","renal","گردے","گردہ","gurda","gurday","liver","hepatic","جگر","jigar"]) && mentionsExtorFast(t)) return "kidney_liver";
+  if (hasAnyFast(t,["pregnant","pregnancy","حمل","حاملہ","hamal"]) && mentionsExtorFast(t)) return "pregnancy";
+  if (hasAnyFast(t,["breastfeed","breastfeeding","feeding baby","nursing","دودھ پلا"]) && mentionsExtorFast(t)) return "breastfeeding";
+  if (hasAnyFast(t,["potassium","پوٹاشیم"]) && mentionsExtorFast(t)) return "potassium";
+  if (hasAnyFast(t,["under 18","under18","18 years","18 سال","child","children","teen","بچہ","بچوں"]) && mentionsExtorFast(t)) return "under18";
   if (hasAnyFast(t,["what is extor","ایکسٹور کیا ہے","what is extor used for","ایکسٹور کس لیے ہے"])) return "what_is";
   return "unknown_extor";
 }
