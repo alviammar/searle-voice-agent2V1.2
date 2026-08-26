@@ -374,6 +374,29 @@ app.post("/api/learn-answer", async (req, res) => {
   } catch (e) { return res.status(500).json({ok:false,error:e.message}); }
 });
 
+app.post("/api/learned-hit", async (req,res) => {
+  const body=req.body||{};
+  const intent=String(body.intent||"").slice(0,80);
+  const question=normalizeLearnText(body.question).slice(0,500);
+  const currentText=normalizeLearnText(body.currentText).slice(0,500);
+  if(!intent || !question) return res.status(400).json({ok:false});
+  try{
+    if(await dbIsReady()){
+      await learningPool.query(`UPDATE sania_learned_answers SET hits=hits+1, updated_at=NOW() WHERE intent=$1 AND question=$2`,[intent,question]);
+    } else {
+      let rows=[]; try{ rows=JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE,"utf8")||"[]"); }catch(e){}
+      if(Array.isArray(rows)){
+        const row=rows.find(r=>r.intent===intent && normalizeLearnText(r.question)===question);
+        if(row){ row.hits=Number(row.hits||0)+1; row.updatedAt=new Date().toISOString(); fs.writeFileSync(LEARNED_ANSWERS_FILE,JSON.stringify(rows,null,2)); }
+      }
+    }
+    // The normal /api/learn event emitted after speech records source=LEARNED_DB;
+    // this endpoint exists specifically to maintain the durable answer hit counter.
+    console.log(`[learned-hit] intent=${intent} question="${question.slice(0,100)}" current="${currentText.slice(0,100)}"`);
+    return res.json({ok:true,storage:learningDbReady?"postgres":"json"});
+  }catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+});
+
 app.post("/api/learning/reclassify", async (req,res) => {
   const result = await reclassifyExistingOtherExtor();
   res.status(result.ok===false ? 500 : 200).json(result);
