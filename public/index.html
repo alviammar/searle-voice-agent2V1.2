@@ -1214,6 +1214,8 @@ function detectExtorIntentFast(t){
   if (hasAnyFast(t,["breastfeed","breastfeeding","feeding baby","nursing","دودھ پلا"]) && mentionsExtorFast(t)) return "breastfeeding";
   if (hasAnyFast(t,["potassium","پوٹاشیم"]) && mentionsExtorFast(t)) return "potassium";
   if (hasAnyFast(t,["under 18","under18","18 years","18 سال","child","children","teen","بچہ","بچوں"]) && mentionsExtorFast(t)) return "under18";
+  if (hasAnyFast(t,["احتیاط","ehtiyat","precaution","precautions","caution","safe to use","is it safe","کیا محفوظ","محفوظ ہے"]) && mentionsExtorFast(t)) return "precautions";
+  if (hasAnyFast(t,["bp","blood pressure","بلڈ پریشر","پریشر"]) && hasAnyFast(t,["high","low","normal","زیادہ","کم","نارمل"])) return "bp_related";
   if (hasAnyFast(t,["what is extor","ایکسٹور کیا ہے","what is extor used for","ایکسٹور کس لیے ہے"])) return "what_is";
   return "unknown_extor";
 }
@@ -2603,7 +2605,7 @@ async function callClaude(userContent){
     // never rewritten.
     if (typeof userContent === "string" && spokenText){
       const learnedIntent = (fastState.pendingIntent && fastState.pendingIntent !== "unknown_extor") ? fastState.pendingIntent : ((stateObj && stateObj.intent) || "other_extor");
-      if (["what_is","strengths","dose_frequency","side_effect_help","side_effect_medicine","side_effects","other_medicines","timing","food","missed_dose","how_to_take","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","price","competitor","other_extor"].includes(learnedIntent)){
+      if (["what_is","strengths","dose_frequency","side_effect_help","side_effect_medicine","side_effects","other_medicines","timing","food","missed_dose","how_to_take","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","price","competitor","precautions","bp_related","other_extor"].includes(learnedIntent)){
         fastState.claudeLearnedThisCall = (fastState.claudeLearnedThisCall||0)+1;
         saveLearnedAnswerFast(userContent, learnedIntent, spokenText);
       }
