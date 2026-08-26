@@ -520,14 +520,14 @@ VOICE STYLE:
 - No lectures, no lists, no robotic disclaimers unless safety requires them.
 
 CALL FLOW + PRESCRIPTION RULE:
-- Opening onboarding is STRICT and simple: caller name -> Extor prescription status -> if YES, visually verify the prescription -> ask weight -> ask usual blood pressure -> then ask what the caller wants to know about Extor.
-- If they say they have a prescription, ask to see it and set request_photo:true. prescription_status="verified" only if the image clearly names Extor. After successful verification, acknowledge it briefly and ask for weight. After weight, ask usual BP. After BP (or if BP is unknown), ask: what would you like to know about Extor?
+- Opening onboarding is STRICT and simple: caller name -> Extor prescription status -> if YES, visually verify the prescription -> ask usual blood pressure -> briefly classify it if known -> then ask what the caller wants to know about Extor.
+- If they say they have a prescription, ask to see it and set request_photo:true. prescription_status="verified" only if the image clearly names Extor. After successful verification, acknowledge it briefly and ask usual BP directly; do NOT ask weight. If BP is known, briefly say whether it appears high, low, or in the normal range, then ask what they want to know about Extor. If BP is unknown, say it is better to get it checked, then ask what they want to know about Extor.
 - If they do NOT have an Extor prescription, DO NOT ask weight, BP, area, pharmacy, or doctor location. Say briefly that Extor is prescription-only and they should consult a doctor and obtain a prescription before Sania can give patient-specific instructions; then wait for them to return with a prescription.
 - Never carry an old question forward through onboarding. Finish onboarding first, then ask what they want to know and answer the fresh question they ask next.
 - After a verified prescription, answer ONLY the caller's CURRENT Extor question directly and sensibly. Never volunteer an unrelated topic, never continue an old question, and never guess from one keyword.
 - Treat every general Extor utterance as a fresh question. Do not auto-answer a pending topic from an earlier turn. If the current full utterance is ambiguous, ask one short clarification instead of guessing.
 - Extor is prescription-only. Never tell the caller to start, stop, change, select, or increase a dose/strength without verified prescription and doctor guidance.
-- Weight and BP are context only. Never use them to calculate or change the Extor dose.
+- BP is context only. Never use it to calculate or change the Extor dose. Do not ask weight anywhere in onboarding.
 - BP classification is informational only, not a diagnosis. A reading around or above 180/120, especially with chest pain, breathing difficulty, confusion, weakness, or severe symptoms, requires urgent medical assessment.
 - No normal Extor intent may skip the onboarding sequence.
 - Never select/change dose or strength.
@@ -619,10 +619,8 @@ const FAST_EXTOR_ANSWERS = {
   ask_prescription: "جی، کیا آپ کے پاس ڈاکٹر کا ایکسٹور کا نسخہ موجود ہے؟",
   ask_photo: "ٹھیک ہے، براہِ کرم اپنا ایکسٹور کا نسخہ کیمرے کے سامنے دکھا دیجیے۔",
   prescription_verified_help: "شکریہ، نسخہ تصدیق ہو گیا ہے؛ اب بتائیے آپ ایکسٹور کے بارے میں کیا جاننا چاہتے ہیں؟",
-  ask_weight: "شکریہ؛ آپ کا وزن تقریباً کتنے کلو ہے؟",
   ask_bp: "ٹھیک ہے؛ آپ کا بلڈ پریشر عموماً کتنا رہتا ہے، مثلاً ایک سو بیس بائی اسی؟",
-  weight_unknown_ack: "کوئی مسئلہ نہیں؛ وزن چیک کر لینا بہتر ہے، اور اگر معلوم ہو تو اب اپنا بلڈ پریشر بتا دیجیے۔",
-  bp_unknown_ack: "کوئی مسئلہ نہیں؛ بلڈ پریشر چیک کر لینا بہتر ہے۔",
+  bp_unknown_ack: "بلڈ پریشر چیک کروا لینا بہتر ہے؛ بہرحال، اب بتائیے آپ ایکسٹور میڈیسن کے بارے میں کیا جاننا چاہتے ہیں؟",
   ask_extor_question: "اب بتائیے، آپ ایکسٹور میڈیسن کے بارے میں کیا جاننا چاہتے ہیں؟",
   bp_ack: "ٹھیک ہے، شکریہ؛ اب بتائیے، آپ ایکسٹور میڈیسن کے بارے میں کیا جاننا چاہتے ہیں؟",
   no_prescription_stop: "ایکسٹور نسخے والی دوا ہے؛ براہِ کرم ڈاکٹر سے مشورہ کر کے نسخہ حاصل کریں، اس کے بغیر میں ذاتی استعمال یا خوراک کی ہدایات نہیں دے سکتی۔",
@@ -1467,25 +1465,12 @@ async function tryFastExtorRoute(rawText){
     return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_help, "caller_name_then_prescription", {userText:rawText}), true;
   }
 
-  // HARD ONBOARDING GATE: prescription -> weight -> BP -> BP context.
-  // No normal Extor intent is allowed to run until this sequence completes.
+  // HARD ONBOARDING GATE: prescription -> BP -> general Extor Q&A.
+  // Weight is intentionally NOT requested. If a stale client/state ever says
+  // awaiting=weight, recover by moving straight to the BP question.
   if (fastState.awaiting === "weight"){
-    fastState.weightAttempts = (fastState.weightAttempts || 0) + 1;
-    const weight=parseWeightFast(rawText);
-    if (!weight){
-      // "I don't know" is a valid answer. Never trap the caller in a loop.
-      if (isUnknownVitalFast(rawText) || fastState.weightAttempts >= 2){
-        fastState.weightKg="unknown";
-        fastState.weightAttempts=0;
-        fastState.awaiting="bp";
-        return fastSpeakResponse(FAST_EXTOR_ANSWERS.weight_unknown_ack, "weight_unknown_then_bp", {userText:rawText}), true;
-      }
-      return fastSpeakResponse("اگر وزن معلوم ہے تو کلو میں بتا دیجیے، ورنہ کہہ دیجیے کہ معلوم نہیں۔", "weight_clarify", {userText:rawText}), true;
-    }
-    fastState.weightKg=weight;
-    fastState.weightAttempts=0;
     fastState.awaiting="bp";
-    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_bp, "weight_then_bp", {userText:rawText}), true;
+    return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_bp, "prescription_then_bp", {userText:rawText}), true;
   }
 
   if (fastState.awaiting === "bp"){
@@ -1503,7 +1488,7 @@ async function tryFastExtorRoute(rawText){
     if (!bp){
       fastState.usualBp="unknown";
       fastState.bpCategory="unknown";
-      return fastSpeakResponse(FAST_EXTOR_ANSWERS.ask_extor_question, "bp_unknown_continue", {userText:rawText}), true;
+      return fastSpeakResponse(FAST_EXTOR_ANSWERS.bp_unknown_ack, "bp_unknown_continue", {userText:rawText}), true;
     }
 
     fastState.usualBp=bp.raw;
@@ -1853,9 +1838,7 @@ setTimeout(()=>{
   prefetchTTS(FAST_EXTOR_ANSWERS.ask_help);
   prefetchTTS(FAST_EXTOR_ANSWERS.off_topic);
   prefetchTTS(FAST_EXTOR_ANSWERS.ask_prescription);
-  prefetchTTS(FAST_EXTOR_ANSWERS.ask_weight);
   prefetchTTS(FAST_EXTOR_ANSWERS.ask_bp);
-  prefetchTTS(FAST_EXTOR_ANSWERS.weight_unknown_ack);
   prefetchTTS(FAST_EXTOR_ANSWERS.bp_unknown_ack);
 }, 50);
 
@@ -2197,7 +2180,7 @@ function connectSTT(isReconnect = false){
             const sinceMicVoice = lastMicVoiceAt ? (now2 - lastMicVoiceAt) : 9999;
             const endpointHeld = endpointFirstSeenAt ? (now2 - endpointFirstSeenAt) : 0;
 
-            const shortOnboardingStage = ["prescription","prescription_blocked","weight","bp"].includes(fastState.awaiting);
+            const shortOnboardingStage = ["prescription","prescription_blocked","bp"].includes(fastState.awaiting);
             const minActiveNeeded = shortOnboardingStage ? 220 : MIN_UTTERANCE_ACTIVE_MS;
             const stillTooShort = activeFor < minActiveNeeded;
             const tokenStillFresh = sinceLastToken < MIN_POST_TOKEN_SETTLE_MS;
@@ -2226,7 +2209,7 @@ function connectSTT(isReconnect = false){
               if (!freshVoiceSeenAt){
                 const stage = fastState.awaiting;
                 const clearPrescription = ["prescription","prescription_blocked"].includes(stage) && (prescriptionNowAvailableFast(committedText) || isNoFast(committedText));
-                const clearWeight = stage === "weight" && (extractWeightFast(committedText) != null || isUnknownVitalFast(committedText));
+                const clearWeight = false; // weight is no longer part of onboarding
                 const clearBp = stage === "bp" && (extractBpFast(committedText) != null || isUnknownVitalFast(committedText) || isNoFast(committedText));
                 if (!(clearPrescription || clearWeight || clearBp)){
                   console.log(`[turn-guard] DROPPED_NO_FRESH_VOICE: ${committedText}`);
@@ -2321,7 +2304,7 @@ function resetLongSilenceTimer(){
 
 async function askAreYouThere(){
   // This is ONLY a presence check; it must never mutate or restart onboarding.
-  // Preserve the exact stage across the prompt (prescription/weight/BP/general).
+  // Preserve the exact stage across the prompt (prescription/BP/general).
   if (listeningPaused || processingReply) return;
   const preservedAwaiting = fastState.awaiting;
   const preservedPrescription = fastState.prescription;
@@ -2498,7 +2481,7 @@ async function callClaude(userContent){
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
-        system: buildSystemPrompt() + `\n\nCURRENT LOCAL CALL STATE: ${JSON.stringify({name:fastState.name,prescription:fastState.prescription,weightKg:fastState.weightKg,usualBp:fastState.usualBp,onboardingComplete:fastState.onboardingComplete,lastIntent:fastState.lastIntent})}\nInterpret ONLY the newest caller utterance. Verify the WHOLE utterance before choosing an intent. Answer ONLY what that complete newest utterance asks. Never answer a previous, pending, implied, or related question unless the caller explicitly asks it now. Do not continue prose from an earlier assistant answer. If the newest question is ambiguous, ask ONE short clarification instead of guessing. Keep the spoken answer to one direct complete sentence whenever possible.`,
+        system: buildSystemPrompt() + `\n\nCURRENT LOCAL CALL STATE: ${JSON.stringify({name:fastState.name,prescription:fastState.prescription,usualBp:fastState.usualBp,onboardingComplete:fastState.onboardingComplete,lastIntent:fastState.lastIntent})}\nInterpret ONLY the newest caller utterance. Verify the WHOLE utterance before choosing an intent. Answer ONLY what that complete newest utterance asks. Never answer a previous, pending, implied, or related question unless the caller explicitly asks it now. Do not continue prose from an earlier assistant answer. If the newest question is ambiguous, ask ONE short clarification instead of guessing. Keep the spoken answer to one direct complete sentence whenever possible.`,
         messages: [{ role:"user", content:userContent }]
       })
     });
@@ -2589,15 +2572,15 @@ async function callClaude(userContent){
       if (newlyVerified && !fastState.onboardingComplete){
         prescriptionJustVerified = true;
         fastState.onboardingComplete = false;
-        fastState.awaiting = "weight";
+        fastState.awaiting = "bp";
         fastState.weightKg = null;
         fastState.usualBp = null;
         fastState.bpCategory = null;
         fastState.weightAttempts = 0;
         fastState.bpAttempts = 0;
         fastState.pendingIntent = null;
-        spokenText = "شکریہ، نسخہ تصدیق ہو گیا ہے؛ " + FAST_EXTOR_ANSWERS.ask_weight;
-        console.log(`[onboarding] PRESCRIPTION_VERIFIED -> awaiting=weight`);
+        spokenText = "شکریہ، نسخہ تصدیق ہو گیا ہے؛ " + FAST_EXTOR_ANSWERS.ask_bp;
+        console.log(`[onboarding] PRESCRIPTION_VERIFIED -> awaiting=bp`);
       }
       stateObj.request_photo = false;
     }
