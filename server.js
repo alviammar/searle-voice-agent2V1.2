@@ -139,7 +139,7 @@ async function initLearningDb(){
     return false;
   }
 }
-const learningDbReadyPromise = initLearningDb();
+const learningDbReadyPromise = initLearningDb().then(async ready => { if(ready){ setTimeout(()=>reclassifyExistingOtherExtor().catch(()=>{}), 800); } return ready; });
 
 async function dbIsReady(){
   if (!learningPool) return false;
@@ -166,39 +166,103 @@ function logVoiceSource(callId, provider, voice, cached=false){
 
 const LEARN_DEDUPE_WINDOW_MS = 8000;
 const recentLearningEvents = new Map();
+
+const CANONICAL_LEARN_INTENTS = new Set([
+  "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine",
+  "other_medicines","missed_dose","how_to_take","timing","food","pregnancy","breastfeeding",
+  "kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","price",
+  "competitor","purchase","precautions","bp_related","other_extor"
+]);
+
 function normalizeIntentName(value){
   const x=String(value||"").trim().toLowerCase();
-  const aliases={unknown_extor:"other_extor",precautions:"other_extor",kidney_precautions:"kidney_liver",renal_precautions:"kidney_liver",liver_precautions:"kidney_liver",interaction:"other_medicines",interactions:"other_medicines",medicine_interaction:"other_medicines",drug_interaction:"other_medicines",dose:"dose_frequency",dosage_frequency:"dose_frequency",competitors:"competitor",alternatives:"competitor",cost:"price"};
+  const aliases={
+    unknown_extor:"other_extor",
+    kidney_precautions:"kidney_liver", renal_precautions:"kidney_liver", liver_precautions:"kidney_liver",
+    interaction:"other_medicines", interactions:"other_medicines", medicine_interaction:"other_medicines", drug_interaction:"other_medicines",
+    dose:"dose_frequency", dosage_frequency:"dose_frequency", competitors:"competitor", alternatives:"competitor", cost:"price",
+    safety:"precautions", caution:"precautions", precaution:"precautions"
+  };
   return aliases[x]||x;
 }
 function learningText(value){ return String(value||"").toLowerCase().replace(/[؟?۔.,!،;؛:()"']/g," ").replace(/\s+/g," ").trim(); }
 function hasLearnAny(t,list){ return list.some(x=>t.includes(x)); }
+function looksLikeChitChatForLearning(text){
+  const t=learningText(text);
+  if(!t || t.length<5) return true;
+  const chit=[
+    "thank you","thanks","thankyou","shukriya","شکریہ","theek hai","ٹھیک ہے","okay","ok ","acha theek","اچھا ٹھیک",
+    "allah hafiz","اللہ حافظ","good bye","goodbye","bye","چلیں ٹھیک","chalein theek","walikum salam","وعلیکم السلام","assalam o alaikum","السلام علیکم"
+  ];
+  const medical=hasLearnAny(t,["extor","ایکسٹور","kidney","renal","گرد","liver","جگر","side effect","سائیڈ","dose","خوراک","tablet","گولی","medicine","دوا","bp","blood pressure","بلڈ پریشر","pregnan","حمل","price","قیمت","competitor","alternative","متبادل","5/80","5/160","10/160"]);
+  return !medical && hasLearnAny(t,chit);
+}
 function inferLearningIntent(text, proposedIntent){
-  const t=learningText(text); let proposed=normalizeIntentName(proposedIntent);
-  if(hasLearnAny(t,["kidney","renal","گردے","گردہ","gurday","gurda"])) return "kidney_liver";
+  const t=learningText(text); const proposed=normalizeIntentName(proposedIntent);
+  // Strong topic-first rules. These always outrank a generic proposed intent.
+  if(hasLearnAny(t,["kidney","kidneys","renal","گردے","گردہ","گردوں","gurday","gurda"])) return "kidney_liver";
   if(hasLearnAny(t,["liver","hepatic","جگر","jigar"])) return "kidney_liver";
   if(hasLearnAny(t,["pregnant","pregnancy","حمل","حاملہ","hamal"])) return "pregnancy";
   if(hasLearnAny(t,["breastfeed","breastfeeding","دودھ پلا","feeding baby","nursing"])) return "breastfeeding";
   if(hasLearnAny(t,["potassium","پوٹاشیم"])) return "potassium";
   if(hasLearnAny(t,["under 18","under18","18 years","18 سال","child","children","teen","بچہ","بچوں"])) return "under18";
-  if(hasLearnAny(t,["twice","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو گولی","دن میں دو"])) return "dose_frequency";
-  if(hasLearnAny(t,["price","cost","rate","قیمت","دام","روپے","pkr","kitne ki","kitni ki"])) return "price";
-  if(hasLearnAny(t,["competitor","alternative","substitute","compare","comparison","versus","better","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valtec"])) return "competitor";
+  if(hasLearnAny(t,["twice","twice a day","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو دفعہ","دو گولی","دو گولیاں","دن میں دو","ایک دن میں دو"])) return "dose_frequency";
+  if(hasLearnAny(t,["price","cost","rate","قیمت","دام","روپے","pkr","kitne ki","kitni ki","کتنے کی","کتنی کی"])) return "price";
+  if(hasLearnAny(t,["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus","better","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valtec","متبادل","مقابلہ"])) return "competitor";
   if(hasLearnAny(t,["missed dose","miss dose","dose miss","bhool","بھول"])) return "missed_dose";
+  if(hasLearnAny(t,["panadol","paracetamol","ibuprofen","brufen","other medicine","another medicine","koi aur dawa","ساتھ کون سی دوا","interaction","ساتھ لے","ساتھ لوں"])) return "other_medicines";
+  const symptom=hasLearnAny(t,["chakkar","dizziness","dizzy","swelling","soojan","سوجن","headache","سر درد","weakness","کمزوری","nausea","متلی","palpitation","دھڑکن"]);
+  if(symptom && hasLearnAny(t,["mujhe","مجھے","having","feel","feeling","ho raha","ہو رہا","what should","kya kar","کیا کروں"])) return "side_effect_help";
   if(hasLearnAny(t,["side effect","side effects","سائیڈ ایفیکٹ","نقصان"])) return "side_effects";
-  if(hasLearnAny(t,["chakkar","dizziness","dizzy","swelling","soojan","سوجن","headache","سر درد"]) && hasLearnAny(t,["mujhe","مجھے","having","feel","feeling","ho raha","ہو رہا","what should","kya kar"])) return "side_effect_help";
-  if(hasLearnAny(t,["panadol","paracetamol","ibuprofen","brufen","other medicine","another medicine","koi aur dawa","ساتھ کون سی دوا","interaction"])) return "other_medicines";
-  if(hasLearnAny(t,["stop extor","stop taking","band kar","بند کر","چھوڑ دوں"])) return "stopping";
+  if(hasLearnAny(t,["stop extor","stop taking","band kar","بند کر","چھوڑ دوں","چھوڑ سکتا","چھوڑ سکتی"])) return "stopping";
   if(hasLearnAny(t,["co extor","co-extor","کو ایکسٹور"])) return "co_extor";
-  if(hasLearnAny(t,["overdose","too many tablets","extra tablets","زیادہ گولیاں"])) return "overdose";
+  if(hasLearnAny(t,["overdose","too many tablets","extra tablets","زیادہ گولیاں","زیادہ خوراک"])) return "overdose";
   if(hasLearnAny(t,["chest pain","سینے میں درد","difficulty breathing","سانس","faint","بے ہوش"])) return "emergency";
-  if(hasLearnAny(t,["5/80","5 80","5/160","5 160","10/160","10 160","strength","power","variation","طاقت"])) return "strengths";
+  if(hasLearnAny(t,["5/80","5 80","5/160","5 160","10/160","10 160","strength","power","variation","variant","طاقت","ورائٹی"])) return "strengths";
   if(hasLearnAny(t,["with food","without food","empty stomach","khane","کھانے","خالی پیٹ"])) return "food";
-  if(hasLearnAny(t,["what time","when should","kab","کس وقت","کب لوں","morning","evening","night"])) return "timing";
+  if(hasLearnAny(t,["what time","when should","kab","کس وقت","کب لوں","morning","evening","night","صبح","شام","رات"])) return "timing";
   if(hasLearnAny(t,["how to take","how should i take","kaise loon","کیسے لوں","water","pani","پانی","milk","doodh","دودھ"])) return "how_to_take";
+  if(hasLearnAny(t,["where can i buy","where to buy","pharmacy","medical store","کہاں ملے","فارمیسی","خرید"])) return "purchase";
+  if(hasLearnAny(t,["bp","blood pressure","بلڈ پریشر","پریشر"]) && hasLearnAny(t,["high","low","normal","زیادہ","کم","نارمل"])) return "bp_related";
+  if(hasLearnAny(t,["احتیاط","ehtiyat","precaution","precautions","caution","safe to use","is it safe","کیا محفوظ","محفوظ ہے"])) return "precautions";
   if(hasLearnAny(t,["what is extor","extor kya hai","ایکسٹور کیا ہے","used for","kis liye","کس لیے"])) return "what_is";
-  if(proposed && proposed!=="other_extor") return proposed;
+  // A specific Claude intent is allowed if it is in the canonical list. Generic
+  // other_extor never overrides the full-question rules above.
+  if(proposed && proposed!=="other_extor" && CANONICAL_LEARN_INTENTS.has(proposed)) return proposed;
   return "other_extor";
+}
+
+async function reclassifyExistingOtherExtor(){
+  if(!(await dbIsReady())) return {ok:false, reason:"db_not_ready"};
+  const stats={answersMoved:0,answersRemoved:0,phrasesMoved:0,phrasesRemoved:0,eventsMoved:0};
+  try{
+    const answers=(await learningPool.query(`SELECT id,question,answer,hits FROM sania_learned_answers WHERE intent IN ('other_extor','unknown_extor')`)).rows;
+    for(const row of answers){
+      if(looksLikeChitChatForLearning(row.question)){
+        await learningPool.query(`DELETE FROM sania_learned_answers WHERE id=$1`,[row.id]); stats.answersRemoved++; continue;
+      }
+      const ni=inferLearningIntent(row.question,null);
+      if(ni && ni!=="other_extor"){
+        await learningPool.query(`INSERT INTO sania_learned_answers(intent,question,answer,hits,updated_at) VALUES($1,$2,$3,$4,NOW()) ON CONFLICT(intent,question) DO UPDATE SET answer=EXCLUDED.answer,hits=GREATEST(sania_learned_answers.hits,EXCLUDED.hits),updated_at=NOW()`,[ni,row.question,row.answer,row.hits||0]);
+        await learningPool.query(`DELETE FROM sania_learned_answers WHERE id=$1`,[row.id]); stats.answersMoved++;
+      }
+    }
+    const phrases=(await learningPool.query(`SELECT id,phrase FROM sania_learned_phrases WHERE intent IN ('other_extor','unknown_extor')`)).rows;
+    for(const row of phrases){
+      if(looksLikeChitChatForLearning(row.phrase)){
+        await learningPool.query(`DELETE FROM sania_learned_phrases WHERE id=$1`,[row.id]); stats.phrasesRemoved++; continue;
+      }
+      const ni=inferLearningIntent(row.phrase,null);
+      if(ni && ni!=="other_extor"){
+        await learningPool.query(`INSERT INTO sania_learned_phrases(intent,phrase) VALUES($1,$2) ON CONFLICT(intent,phrase) DO NOTHING`,[ni,row.phrase]);
+        await learningPool.query(`DELETE FROM sania_learned_phrases WHERE id=$1`,[row.id]); stats.phrasesMoved++;
+      }
+    }
+    const events=(await learningPool.query(`SELECT id,text FROM sania_learning_events WHERE intent IN ('other_extor','unknown_extor')`)).rows;
+    for(const row of events){ const ni=inferLearningIntent(row.text,null); if(ni && ni!=="other_extor"){ await learningPool.query(`UPDATE sania_learning_events SET intent=$1 WHERE id=$2`,[ni,row.id]); stats.eventsMoved++; } }
+    console.log(`[learning-migrate] ${JSON.stringify(stats)}`);
+    return {ok:true,...stats};
+  }catch(e){ console.error('[learning-migrate] failed:',e.message); return {ok:false,error:e.message}; }
 }
 function isDuplicateLearningEvent(callId,text,intent,source){
   const key=[String(callId||""),learningText(text),String(intent||""),String(source||"")].join("|"); const now=Date.now(),prev=recentLearningEvents.get(key)||0; recentLearningEvents.set(key,now);
@@ -259,7 +323,7 @@ app.post("/api/learn", async (req, res) => {
 
   const APPROVED_LEARN_INTENTS = new Set([
     "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine","other_medicines","missed_dose","how_to_take","timing",
-    "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase","price","competitor"
+    "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase","price","competitor","precautions","bp_related"
   ]);
   if (safe.matched && APPROVED_LEARN_INTENTS.has(safe.intent) && safe.text.length >= 3) {
     await addLearnedPhrase(safe.intent, safe.text);
@@ -278,10 +342,11 @@ function normalizeLearnText(value) {
 // and only for a small approved set of general Extor intents.
 app.post("/api/learn-answer", async (req, res) => {
   const body = req.body || {};
-  const allowed = new Set(["what_is", "strengths", "dose_frequency", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "price", "competitor", "purchase", "other_extor"]);
+  const allowed = new Set(["what_is", "strengths", "dose_frequency", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "price", "competitor", "purchase", "precautions", "bp_related", "other_extor"]);
   const question = normalizeLearnText(body.question).slice(0, 500);
   const intent = inferLearningIntent(question, body.intent);
   const answer = String(body.answer || "").replace(/<state>[\s\S]*?<\/state>/g, "").trim().slice(0, 700);
+  if (looksLikeChitChatForLearning(question)) return res.json({ok:true, skipped:"chitchat"});
   if (!allowed.has(intent) || question.length < 5 || answer.length < 8) return res.status(400).json({ok:false});
   if (/\b\d{2,3}\s*(?:\/|over|by)\s*\d{2,3}\b/i.test(question) || /\b\d{2,3}\s*kg\b/i.test(question)) {
     return res.json({ok:true, skipped:"patient_specific"});
@@ -307,6 +372,11 @@ app.post("/api/learn-answer", async (req, res) => {
     console.log(`[learning-promote] intent=${intent} question="${question.slice(0,120)}" storage=${learningDbReady?'postgres':'json'}`);
     return res.json({ok:true, intent, storage:learningDbReady?"postgres":"json"});
   } catch (e) { return res.status(500).json({ok:false,error:e.message}); }
+});
+
+app.post("/api/learning/reclassify", async (req,res) => {
+  const result = await reclassifyExistingOtherExtor();
+  res.status(result.ok===false ? 500 : 200).json(result);
 });
 
 app.get("/api/learned-answers", async (req, res) => {
