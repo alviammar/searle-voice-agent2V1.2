@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const { WebSocket, WebSocketServer } = require("ws");
+const { Pool } = require("pg");
 
 const app = express();
 // The UI may be hosted separately (for example on Netlify) while this
@@ -76,6 +77,77 @@ fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
 if (!fs.existsSync(LEARNED_PHRASES_FILE)) fs.writeFileSync(LEARNED_PHRASES_FILE, JSON.stringify({}, null, 2));
 if (!fs.existsSync(LEARNED_ANSWERS_FILE)) fs.writeFileSync(LEARNED_ANSWERS_FILE, JSON.stringify([], null, 2));
 
+
+// Persistent learning store. On Render, set DATABASE_URL to a PostgreSQL
+// database. If DATABASE_URL is absent (for local Mac testing), the agent
+// safely falls back to the legacy JSON files in /data.
+const DATABASE_URL = process.env.DATABASE_URL || "";
+const learningPool = DATABASE_URL ? new Pool({
+  connectionString: DATABASE_URL,
+  ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+}) : null;
+let learningDbReady = false;
+let learningDbInitError = null;
+
+async function initLearningDb(){
+  if (!learningPool) return false;
+  try {
+    await learningPool.query(`
+      CREATE TABLE IF NOT EXISTS sania_learned_answers (
+        id BIGSERIAL PRIMARY KEY,
+        intent TEXT NOT NULL,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        hits INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(intent, question)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sania_answers_intent ON sania_learned_answers(intent);
+
+      CREATE TABLE IF NOT EXISTS sania_learned_phrases (
+        id BIGSERIAL PRIMARY KEY,
+        intent TEXT NOT NULL,
+        phrase TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(intent, phrase)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sania_phrases_intent ON sania_learned_phrases(intent);
+
+      CREATE TABLE IF NOT EXISTS sania_learning_events (
+        id BIGSERIAL PRIMARY KEY,
+        ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        call_id TEXT,
+        text TEXT,
+        intent TEXT,
+        matched BOOLEAN NOT NULL DEFAULT FALSE,
+        used_claude BOOLEAN NOT NULL DEFAULT FALSE,
+        latency_ms INTEGER,
+        source TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_sania_events_ts ON sania_learning_events(ts DESC);
+    `);
+    learningDbReady = true;
+    console.log('[learning-db] PostgreSQL READY — learning is persistent/global');
+    return true;
+  } catch (err) {
+    learningDbInitError = err;
+    learningDbReady = false;
+    console.error('[learning-db] PostgreSQL unavailable; using JSON fallback:', err.message);
+    return false;
+  }
+}
+const learningDbReadyPromise = initLearningDb();
+
+async function dbIsReady(){
+  if (!learningPool) return false;
+  if (learningDbReady) return true;
+  await learningDbReadyPromise.catch(()=>false);
+  return learningDbReady;
+}
+
 function ttsCacheKey(text, tone) {
   const providerSig = TTS_PROVIDER === "uplift"
     ? `uplift|${UPLIFT_TTS_VOICE}|${UPLIFT_TTS_FORMAT}`
@@ -133,12 +205,22 @@ function isDuplicateLearningEvent(callId,text,intent,source){
   if(recentLearningEvents.size>500){ for(const [k,ts] of recentLearningEvents) if(now-ts>60000) recentLearningEvents.delete(k); }
   return !!prev && (now-prev)<LEARN_DEDUPE_WINDOW_MS;
 }
-function addLearnedPhrase(intent,text){
+async function addLearnedPhrase(intent,text){
   intent=normalizeIntentName(intent); const normalized=learningText(text); if(!intent||normalized.length<3)return;
+  if (await dbIsReady()) {
+    try {
+      await learningPool.query(
+        `INSERT INTO sania_learned_phrases(intent, phrase) VALUES($1,$2)
+         ON CONFLICT(intent, phrase) DO NOTHING`,
+        [intent, normalized]
+      );
+      return;
+    } catch (e) { console.error('[learning-db] phrase save failed:', e.message); }
+  }
   try{ const learned=JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE,"utf8")||"{}"); learned[intent]=Array.isArray(learned[intent])?learned[intent]:[]; if(!learned[intent].includes(normalized)){ learned[intent].push(normalized); learned[intent]=learned[intent].slice(-250); fs.writeFileSync(LEARNED_PHRASES_FILE,JSON.stringify(learned,null,2)); } }catch(e){}
 }
 
-app.post("/api/learn", (req, res) => {
+app.post("/api/learn", async (req, res) => {
   const evt = req.body || {};
   const safe = {
     ts: new Date().toISOString(),
@@ -151,11 +233,20 @@ app.post("/api/learn", (req, res) => {
     source: String(evt.source || (evt.usedClaude ? "CLAUDE" : "BUILT_IN")).slice(0, 40)
   };
   const duplicate = isDuplicateLearningEvent(safe.callId, safe.text, safe.intent, safe.source);
-  if (!duplicate) { try { fs.appendFileSync(LEARNING_LOG, JSON.stringify(safe) + "\n"); } catch (e) {} }
-  else console.log(`[learning-dedupe] skipped duplicate intent=${safe.intent} source=${safe.source}`);
+  if (!duplicate) {
+    if (await dbIsReady()) {
+      try {
+        await learningPool.query(
+          `INSERT INTO sania_learning_events(ts,call_id,text,intent,matched,used_claude,latency_ms,source)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [safe.ts,safe.callId,safe.text,safe.intent,safe.matched,safe.usedClaude,safe.latencyMs,safe.source]
+        );
+      } catch (e) { console.error('[learning-db] event save failed:', e.message); }
+    } else {
+      try { fs.appendFileSync(LEARNING_LOG, JSON.stringify(safe) + "\n"); } catch (e) {}
+    }
+  } else console.log(`[learning-dedupe] skipped duplicate intent=${safe.intent} source=${safe.source}`);
 
-  // Human-readable source flag for live training/debugging in Terminal.
-  // CLAUDE_REQUEST is routing-only; CLAUDE_RESPONSE is the actual spoken reply.
   if (safe.source !== "CLAUDE_REQUEST") {
     const label = safe.source === "CLAUDE_RESPONSE" ? "CLAUDE" : safe.source;
     console.log("\n============================================================");
@@ -166,18 +257,15 @@ app.post("/api/learn", (req, res) => {
     console.log("============================================================\n");
   }
 
-  // Auto-learn ONLY wording for an already-approved Extor intent. Never learn
-  // a new medical fact, off-topic classification, dose, or response from a caller.
   const APPROVED_LEARN_INTENTS = new Set([
     "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine","other_medicines","missed_dose","how_to_take","timing",
     "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase","price","competitor"
   ]);
   if (safe.matched && APPROVED_LEARN_INTENTS.has(safe.intent) && safe.text.length >= 3) {
-    addLearnedPhrase(safe.intent, safe.text);
+    await addLearnedPhrase(safe.intent, safe.text);
   }
-  res.json({ ok: true });
+  res.json({ ok: true, storage: learningDbReady ? "postgres" : "json" });
 });
-
 
 function normalizeLearnText(value) {
   return String(value || "").toLowerCase()
@@ -188,63 +276,85 @@ function normalizeLearnText(value) {
 // Learned answers are a performance cache, not a self-editing medical source.
 // Only answers produced by Claude under the locked Extor prompt can be saved,
 // and only for a small approved set of general Extor intents.
-app.post("/api/learn-answer", (req, res) => {
+app.post("/api/learn-answer", async (req, res) => {
   const body = req.body || {};
   const allowed = new Set(["what_is", "strengths", "dose_frequency", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "price", "competitor", "purchase", "other_extor"]);
   const question = normalizeLearnText(body.question).slice(0, 500);
   const intent = inferLearningIntent(question, body.intent);
   const answer = String(body.answer || "").replace(/<state>[\s\S]*?<\/state>/g, "").trim().slice(0, 700);
   if (!allowed.has(intent) || question.length < 5 || answer.length < 8) return res.status(400).json({ok:false});
-  // Do not persist clearly patient-specific numeric advice. Vitals can still be
-  // handled live by Claude, but that answer should not become reusable.
   if (/\b\d{2,3}\s*(?:\/|over|by)\s*\d{2,3}\b/i.test(question) || /\b\d{2,3}\s*kg\b/i.test(question)) {
     return res.json({ok:true, skipped:"patient_specific"});
   }
   try {
-    let rows = JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE, "utf8") || "[]");
-    if (!Array.isArray(rows)) rows = [];
-    const existing = rows.find(r => r.intent === intent && r.question === question);
-    const row = { intent, question, answer, updatedAt:new Date().toISOString(), hits: existing ? Number(existing.hits||0) : 0 };
-    rows = rows.filter(r => !(r.intent === intent && r.question === question));
-    rows.push(row);
-    rows = rows.slice(-400);
-    fs.writeFileSync(LEARNED_ANSWERS_FILE, JSON.stringify(rows, null, 2));
-    addLearnedPhrase(intent, question);
-    console.log(`[learning-promote] intent=${intent} question="${question.slice(0,120)}"`);
-    return res.json({ok:true, intent});
-  } catch (e) {
-    return res.status(500).json({ok:false,error:e.message});
-  }
+    if (await dbIsReady()) {
+      await learningPool.query(
+        `INSERT INTO sania_learned_answers(intent,question,answer,hits,updated_at)
+         VALUES($1,$2,$3,0,NOW())
+         ON CONFLICT(intent,question) DO UPDATE SET answer=EXCLUDED.answer, updated_at=NOW()`,
+        [intent, question, answer]
+      );
+    } else {
+      let rows = JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE, "utf8") || "[]");
+      if (!Array.isArray(rows)) rows = [];
+      const existing = rows.find(r => r.intent === intent && r.question === question);
+      const row = { intent, question, answer, updatedAt:new Date().toISOString(), hits: existing ? Number(existing.hits||0) : 0 };
+      rows = rows.filter(r => !(r.intent === intent && r.question === question));
+      rows.push(row); rows = rows.slice(-400);
+      fs.writeFileSync(LEARNED_ANSWERS_FILE, JSON.stringify(rows, null, 2));
+    }
+    await addLearnedPhrase(intent, question);
+    console.log(`[learning-promote] intent=${intent} question="${question.slice(0,120)}" storage=${learningDbReady?'postgres':'json'}`);
+    return res.json({ok:true, intent, storage:learningDbReady?"postgres":"json"});
+  } catch (e) { return res.status(500).json({ok:false,error:e.message}); }
 });
 
-app.get("/api/learned-answers", (req, res) => {
+app.get("/api/learned-answers", async (req, res) => {
   try {
+    if (await dbIsReady()) {
+      const q = await learningPool.query(`SELECT intent,question,answer,hits,updated_at AS "updatedAt" FROM sania_learned_answers ORDER BY updated_at DESC LIMIT 1000`);
+      return res.json({ok:true, storage:"postgres", answers:q.rows});
+    }
     const rows = JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE, "utf8") || "[]");
-    res.json({ok:true, answers:Array.isArray(rows) ? rows : []});
-  } catch (e) { res.json({ok:true, answers:[]}); }
+    res.json({ok:true, storage:"json", answers:Array.isArray(rows) ? rows : []});
+  } catch (e) { res.json({ok:true, storage:learningDbReady?"postgres":"json", answers:[]}); }
 });
 
-app.get("/api/learned-phrases", (req, res) => {
-  let learned = {};
-  try { learned = JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE, "utf8") || "{}"); } catch (e) {}
-  res.json({ ok: true, learned });
-});
-
-app.get("/api/learning-summary", (req, res) => {
-  let learned = {};
-  try { learned = JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE, "utf8") || "{}"); } catch (e) {}
-  let recent = [];
+app.get("/api/learned-phrases", async (req, res) => {
   try {
-    const lines = fs.readFileSync(LEARNING_LOG, "utf8").trim().split("\n").filter(Boolean).slice(-50);
-    recent = lines.map(x => { try { return JSON.parse(x); } catch (e) { return null; } }).filter(Boolean).reverse();
-  } catch (e) {}
-  let answers = [];
-  try { answers = JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE, "utf8") || "[]"); } catch (e) {}
-  if (!Array.isArray(answers)) answers = [];
-  const learnedAnswerCounts = {};
-  for (const row of answers) { const k=String(row && row.intent || "unknown"); learnedAnswerCounts[k]=(learnedAnswerCounts[k]||0)+1; }
-  const quality = { learnedAnswers:answers.length, learnedPhrases:Object.values(learned).reduce((n,v)=>n+(Array.isArray(v)?v.length:0),0), recentClaudeFallbacks:recent.filter(x=>x&&x.usedClaude).length, recentLearnedDbHits:recent.filter(x=>x&&String(x.source||"").includes("LEARNED_DB")).length, recentUnknown:recent.filter(x=>x&&(x.intent==="unknown_extor"||x.intent==="other_extor")).length };
-  res.json({ ok: true, learnedPhraseCounts: Object.fromEntries(Object.entries(learned).map(([k,v]) => [k, Array.isArray(v) ? v.length : 0])), learnedAnswerCounts, quality, recent });
+    if (await dbIsReady()) {
+      const q = await learningPool.query(`SELECT intent, phrase FROM sania_learned_phrases ORDER BY id ASC`);
+      const learned={};
+      for(const row of q.rows){ learned[row.intent]=learned[row.intent]||[]; learned[row.intent].push(row.phrase); }
+      return res.json({ok:true, storage:"postgres", learned});
+    }
+    let learned = {}; try { learned = JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE, "utf8") || "{}"); } catch (e) {}
+    res.json({ ok: true, storage:"json", learned });
+  } catch(e){ res.json({ok:true, learned:{}}); }
+});
+
+app.get("/api/learning-summary", async (req, res) => {
+  try {
+    let learned={}, recent=[], answers=[];
+    if (await dbIsReady()) {
+      const [phrasesQ, eventsQ, answersQ] = await Promise.all([
+        learningPool.query(`SELECT intent, phrase FROM sania_learned_phrases ORDER BY id ASC`),
+        learningPool.query(`SELECT ts,call_id AS "callId",text,intent,matched,used_claude AS "usedClaude",latency_ms AS "latencyMs",source FROM sania_learning_events ORDER BY ts DESC LIMIT 50`),
+        learningPool.query(`SELECT intent,question,answer,hits,updated_at AS "updatedAt" FROM sania_learned_answers ORDER BY updated_at DESC LIMIT 1000`)
+      ]);
+      for(const row of phrasesQ.rows){ learned[row.intent]=learned[row.intent]||[]; learned[row.intent].push(row.phrase); }
+      recent=eventsQ.rows; answers=answersQ.rows;
+    } else {
+      try { learned = JSON.parse(fs.readFileSync(LEARNED_PHRASES_FILE, "utf8") || "{}"); } catch (e) {}
+      try { const lines = fs.readFileSync(LEARNING_LOG, "utf8").trim().split("\n").filter(Boolean).slice(-50); recent = lines.map(x => { try { return JSON.parse(x); } catch (e) { return null; } }).filter(Boolean).reverse(); } catch (e) {}
+      try { answers = JSON.parse(fs.readFileSync(LEARNED_ANSWERS_FILE, "utf8") || "[]"); } catch (e) {}
+      if (!Array.isArray(answers)) answers = [];
+    }
+    const learnedAnswerCounts = {};
+    for (const row of answers) { const k=String(row && row.intent || "unknown"); learnedAnswerCounts[k]=(learnedAnswerCounts[k]||0)+1; }
+    const quality = { learnedAnswers:answers.length, learnedPhrases:Object.values(learned).reduce((n,v)=>n+(Array.isArray(v)?v.length:0),0), recentClaudeFallbacks:recent.filter(x=>x&&x.usedClaude).length, recentLearnedDbHits:recent.filter(x=>x&&String(x.source||"").includes("LEARNED_DB")).length, recentUnknown:recent.filter(x=>x&&(x.intent==="unknown_extor"||x.intent==="other_extor")).length };
+    res.json({ ok:true, storage:learningDbReady?"postgres":"json", learnedPhraseCounts:Object.fromEntries(Object.entries(learned).map(([k,v])=>[k,Array.isArray(v)?v.length:0])), learnedAnswerCounts, quality, recent });
+  } catch(e){ res.status(500).json({ok:false,error:e.message}); }
 });
 
 app.post("/api/chat", async (req, res) => {
@@ -363,7 +473,9 @@ app.get("/healthz", (req, res) => res.json({
   hasSonioxKey: !!SONIOX_API_KEY,
   hasUpliftKey: !!UPLIFT_API_KEY,
   ttsProvider: TTS_PROVIDER,
-  upliftVoice: UPLIFT_TTS_VOICE
+  upliftVoice: UPLIFT_TTS_VOICE,
+  learningStorage: learningDbReady ? "postgres" : "json",
+  hasDatabaseUrl: !!DATABASE_URL
 }));
 
 // Real-time voice over Soniox's WebSocket API — one dedicated connection per
