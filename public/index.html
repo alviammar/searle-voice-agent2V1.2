@@ -737,9 +737,20 @@ function findLearnedAnswerFast(rawText, intent){
   // Generic/other Extor answers are deliberately much stricter: these are the
   // easiest answers to reuse incorrectly across different scenarios.
   const generic = !requestedIntent || requestedIntent === "other_extor";
-  const ok = generic
-    ? (score >= 0.90 && overlap >= 0.66)
-    : ((score >= 0.86 && overlap >= 0.50) || (score >= 0.74 && overlap >= 0.66 && support >= 1));
+  // Reuse must be strict across different intents, but once the FULL current
+  // question has already been classified into the same specific intent we can
+  // be more tolerant of natural Urdu/Roman-Urdu rephrasing. This is what lets
+  // training actually reduce Claude usage without allowing cross-topic answers.
+  const safetySensitive = new Set(["side_effect_help","side_effect_medicine","other_medicines","kidney_liver","precautions"]);
+  const exactQuestion = normFast(rawText) === normFast(best.question);
+  let ok;
+  if (generic){
+    ok = exactQuestion || (score >= 0.88 && overlap >= 0.62);
+  } else if (safetySensitive.has(requestedIntent)) {
+    ok = exactQuestion || ((score >= 0.58 && overlap >= 0.40 && support >= 1) || (score >= 0.70 && overlap >= 0.50));
+  } else {
+    ok = exactQuestion || ((score >= 0.50 && overlap >= 0.33 && support >= 1) || score >= 0.68);
+  }
   if (!ok) return null;
   console.log(`[learned-match] intent=${requestedIntent||"unknown"} confidence=${score.toFixed(2)} overlap=${overlap.toFixed(2)} support=${support}`);
   return {...best, _score:score, _support:support, _overlap:overlap};
@@ -756,6 +767,11 @@ async function saveLearnedAnswerFast(question,intent,answer){
       learnedAnswerCache.push({question:normFast(question),intent:resolvedIntent,answer});
       console.log(`[learning-promote] local intent=${resolvedIntent}: ${question}`);
     }
+  }catch(e){}
+}
+async function markLearnedHitFast(row, currentText){
+  try{
+    fetch(apiUrl("/api/learned-hit"), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({intent:row.intent, question:row.question, currentText:currentText||"", callId})}).catch(()=>{});
   }catch(e){}
 }
 function phraseBoundaryFast(t, phrases){
@@ -1554,6 +1570,25 @@ async function tryFastExtorRoute(rawText){
   const intent=detectExtorIntentFast(t);
   console.log(`[fast-route] ${intent}: ${rawText}`);
 
+  // IMPORTANT: query learned PostgreSQL answers for every reusable specific
+  // intent, not just unknown_extor/side-effect branches. Built-in answers remain
+  // the fallback if no sufficiently similar learned answer exists.
+  const learnedEligibleIntents = new Set([
+    "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine",
+    "other_medicines","missed_dose","how_to_take","timing","food","kidney_liver","precautions",
+    "potassium","stopping","co_extor","bp_related"
+  ]);
+  if (learnedEligibleIntents.has(intent) && intent !== "side_effect_help"){
+    const learnedNow = findLearnedAnswerFast(rawText, intent);
+    if (learnedNow && fastState.lastLearnedAnswerId !== `${learnedNow.intent}:${learnedNow.question}`){
+      fastState.lastLearnedAnswerId = `${learnedNow.intent}:${learnedNow.question}`;
+      fastState.learnedHits = (fastState.learnedHits||0)+1;
+      console.log(`[learned-answer] HIT intent=${intent} confidence=${learnedNow._score.toFixed(2)} overlap=${(learnedNow._overlap||0).toFixed(2)}: ${rawText}`);
+      markLearnedHitFast(learnedNow, rawText);
+      return fastSpeakResponse(learnedNow.answer, intent, {userText:rawText, source:"LEARNED_DB"}), true;
+    }
+  }
+
   // If the caller says they are actually experiencing a side effect, do not
   // repeat the side-effect list. Switch to symptom-specific management.
   if (intent === "side_effect_help"){
@@ -1571,6 +1606,7 @@ async function tryFastExtorRoute(rawText){
       fastState.lastAnswerKey = "learned:" + learned.question;
       fastState.learnedHits = (fastState.learnedHits||0)+1;
       console.log(`[learned-answer] HIT ${learned._score.toFixed(2)} overlap=${(learned._overlap||0).toFixed(2)}: ${rawText}`);
+      markLearnedHitFast(learned, rawText);
       return fastSpeakResponse(learned.answer, "learned_side_effect", {userText:rawText, source:"LEARNED_DB"}), true;
     }
     if (nuanced && !(fastState.sideEffectCounts && fastState.sideEffectCounts[symptom||"general"])){
@@ -1647,6 +1683,7 @@ async function tryFastExtorRoute(rawText){
     fastState.lastLearnedAnswerId = cachedUnknown.question;
     fastState.learnedHits = (fastState.learnedHits||0)+1;
     console.log(`[learned-answer] HIT ${cachedUnknown._score.toFixed(2)} overlap=${(cachedUnknown._overlap||0).toFixed(2)}: ${rawText}`);
+    markLearnedHitFast(cachedUnknown, rawText);
     return fastSpeakResponse(cachedUnknown.answer, "learned_other_extor", {userText:rawText, source:"LEARNED_DB"}), true;
   }
   await logLearningFast(rawText, "unknown_extor", false, true, null, "CLAUDE_REQUEST");
