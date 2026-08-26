@@ -374,6 +374,111 @@ app.post("/api/learn-answer", async (req, res) => {
   } catch (e) { return res.status(500).json({ok:false,error:e.message}); }
 });
 
+
+// --- Server-side learned answer matcher (PostgreSQL-first) ---
+function lmNorm(v){
+  return String(v||"").toLowerCase().replace(/[؟?۔.,!؛:()\[\]{}]/g," ").replace(/\s+/g," ").trim();
+}
+function lmCanon(w){
+  const x=String(w||"").toLowerCase();
+  const groups={
+    strength:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","ورائٹی"],
+    dose:["dose","dosage","خوراک"], twice:["twice","2","two","do","دو","بار","دفعہ"],
+    food:["food","khana","khane","کھانا","کھانے"], water:["water","pani","پانی"], milk:["milk","doodh","دودھ"],
+    miss:["miss","missed","bhool","بھول"], kidney:["kidney","kidneys","renal","gurda","gurday","گردہ","گردے"],
+    liver:["liver","hepatic","jigar","جگر"], pregnant:["pregnant","pregnancy","hamal","حمل","حاملہ"],
+    dizzy:["dizzy","dizziness","chakkar","چکر"], swelling:["swelling","soojan","sooj","سوجن"],
+    headache:["headache","sar","sir","سر","درد"], nausea:["nausea","متلی","matli"],
+    panadol:["panadol","paracetamol","acetaminophen"], ibuprofen:["ibuprofen","brufen","nsaid","nsaids"],
+    aspirin:["aspirin"], potassium:["potassium","پوٹاشیم"], stop:["stop","stopping","band","بند","چھوڑ"],
+    price:["price","cost","rate","قیمت","دام","pkr","روپے"], competitor:["competitor","alternative","substitute","compare","comparison","versus","exforge","avsar","amlortan","amstan","dioplus","newday","valam"],
+    bp:["bp","blood","pressure","بلڈ","پریشر"]
+  };
+  for(const [k,a] of Object.entries(groups)) if(a.includes(x)) return k;
+  return x;
+}
+function lmTokens(v){
+  const stop=new Set(["extor","ایکسٹور","medicine","medicin","tablet","dawa","goli","دوا","گولی","kya","kia","hai","hain","he","main","mein","mujhe","mera","meri","mere","what","is","are","the","a","an","i","me","my","can","could","would","do","does","with","for","of","to","it","کیا","ہے","ہیں","میں","مجھے","میرا","میری","میرے","کے","کی","کا","کو","سے","اور"]);
+  return new Set(lmNorm(v).split(/\s+/).map(lmCanon).filter(x=>x&&x.length>1&&!stop.has(x)));
+}
+function lmOverlap(a,b){
+  const A=lmTokens(a),B=lmTokens(b); if(!A.size||!B.size) return 0;
+  let n=0; for(const x of A) if(B.has(x)) n++;
+  return n/Math.max(1,Math.min(A.size,B.size));
+}
+function lmJaccard(a,b){
+  const A=lmTokens(a),B=lmTokens(b); if(!A.size||!B.size) return 0;
+  let n=0; for(const x of A) if(B.has(x)) n++;
+  return n/Math.max(A.size,B.size);
+}
+function lmConcepts(v){
+  const t=lmNorm(v); const out=new Set();
+  const rules={
+    kidney:["kidney","kidneys","renal","gurda","gurday","گردہ","گردے"], liver:["liver","hepatic","jigar","جگر"],
+    pregnancy:["pregnant","pregnancy","hamal","حمل","حاملہ"], breastfeeding:["breastfeed","breastfeeding","nursing","دودھ پلا"],
+    dizziness:["dizzy","dizziness","chakkar","چکر"], swelling:["swelling","soojan","سوجن"], headache:["headache","sar dard","sir dard","سر درد"], nausea:["nausea","matli","متلی"],
+    panadol:["panadol","paracetamol","acetaminophen"], ibuprofen:["ibuprofen","brufen"], aspirin:["aspirin"], potassium:["potassium","پوٹاشیم"],
+    twice:["twice","two times","2 times","2 tablets","two tablets","do baar","2 baar","دو بار","دو دفعہ","دو گولی","دن میں دو"],
+    missed:["missed dose","miss dose","dose miss","bhool","بھول"], food:["food","khana","khane","کھانا","کھانے","empty stomach","خالی پیٹ"],
+    liquid:["water","pani","پانی","milk","doodh","دودھ"], strengths:["5/80","5 80","5/160","5 160","10/160","10 160","strength","power","variation","طاقت"],
+    price:["price","cost","rate","قیمت","دام","pkr","روپے"], competitor:["competitor","alternative","substitute","compare","comparison","versus","exforge","avsar","amlortan","amstan","dioplus","newday","valam"],
+    stop:["stop","stopping","band","بند","چھوڑ"], bp:["bp","blood pressure","بلڈ پریشر"]
+  };
+  for(const [k,a] of Object.entries(rules)) if(a.some(x=>t.includes(x))) out.add(k);
+  return out;
+}
+function lmConceptOverlap(a,b){
+  const A=lmConcepts(a),B=lmConcepts(b); if(!A.size||!B.size) return 0;
+  let n=0; for(const x of A) if(B.has(x)) n++;
+  return n/Math.max(1,Math.min(A.size,B.size));
+}
+const LM_CANONICAL_INTENTS=new Set(["what_is","strengths","dose_frequency","side_effects","missed_dose","how_to_take","timing","food","stopping","co_extor","price","competitor","pregnancy","breastfeeding","potassium","under18"]);
+const LM_CONCEPT_INTENTS=new Set(["side_effect_help","side_effect_medicine","other_medicines","kidney_liver","precautions","bp_related"]);
+function lmRank(question,row,intent,totalSameIntent){
+  const exact=lmNorm(question)===lmNorm(row.question);
+  const jac=lmJaccard(question,row.question), ov=lmOverlap(question,row.question), co=lmConceptOverlap(question,row.question);
+  let ok=false, reason="";
+  if(exact){ok=true;reason="exact";}
+  else if(LM_CANONICAL_INTENTS.has(intent)){
+    // Once the current utterance has already been confidently classified into a
+    // canonical intent, one learned answer for that intent is reusable across language/rephrasing.
+    if(totalSameIntent===1){ok=true;reason="single-intent-answer";}
+    else if(co>0 || ov>=0.28 || jac>=0.22){ok=true;reason="canonical-intent";}
+  } else if(LM_CONCEPT_INTENTS.has(intent)){
+    if(co>=0.5 && (ov>=0.15 || jac>=0.12 || co>=1)){ok=true;reason="concept-match";}
+    else if(ov>=0.52 || jac>=0.45){ok=true;reason="strong-wording";}
+  } else if(intent==="other_extor"){
+    if((co>=1 && ov>=0.35) || ov>=0.72 || jac>=0.62){ok=true;reason="strict-other";}
+  } else if(ov>=0.48 || jac>=0.40){ok=true;reason="wording";}
+  const score=(jac*0.35)+(ov*0.35)+(co*0.30)+(exact?1:0);
+  return {ok,score,jac,ov,co,reason};
+}
+app.post("/api/learned-match", async (req,res)=>{
+  try{
+    const question=String(req.body?.question||"").trim();
+    let intent=String(req.body?.intent||"").trim();
+    if(intent==="unknown_extor") intent="other_extor";
+    if(!question||!intent) return res.status(400).json({ok:false,error:"question and intent required"});
+    let rows=[];
+    if(learningPool){
+      const q=await learningPool.query(`SELECT intent,question,answer,hits,updated_at AS "updatedAt" FROM sania_learned_answers WHERE intent=$1 ORDER BY hits DESC, updated_at DESC LIMIT 100`,[intent]);
+      rows=q.rows;
+    }else{
+      rows=readJsonSafe(LEARNED_ANSWERS_FILE,[]).filter(x=>x&&x.intent===intent);
+    }
+    if(!rows.length) return res.json({ok:true,hit:false,intent,count:0});
+    let best=null,bestRank=null;
+    for(const row of rows){ const r=lmRank(question,row,intent,rows.length); if(r.ok && (!bestRank || r.score>bestRank.score)){best=row;bestRank=r;} }
+    if(!best) return res.json({ok:true,hit:false,intent,count:rows.length});
+    if(learningPool){
+      await learningPool.query(`UPDATE sania_learned_answers SET hits=hits+1,updated_at=NOW() WHERE intent=$1 AND question=$2`,[best.intent,best.question]);
+      await learningPool.query(`INSERT INTO sania_learning_events(ts,call_id,text,intent,matched,used_claude,source) VALUES(NOW(),$1,$2,$3,true,false,'LEARNED_DB')`,[String(req.body?.callId||""),question,best.intent]);
+    }
+    console.log(`[learned-server-match] HIT intent=${intent} reason=${bestRank.reason} score=${bestRank.score.toFixed(2)} overlap=${bestRank.ov.toFixed(2)} concept=${bestRank.co.toFixed(2)} current="${question.slice(0,100)}" learned="${best.question.slice(0,100)}"`);
+    return res.json({ok:true,hit:true,intent:best.intent,question:best.question,answer:best.answer,score:bestRank.score,overlap:bestRank.ov,conceptOverlap:bestRank.co,reason:bestRank.reason});
+  }catch(e){console.error('[learned-server-match] error',e);return res.status(500).json({ok:false,error:String(e.message||e)});}
+});
+
 app.post("/api/learned-hit", async (req,res) => {
   const body=req.body||{};
   const intent=String(body.intent||"").slice(0,80);
