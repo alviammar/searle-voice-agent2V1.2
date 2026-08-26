@@ -755,6 +755,15 @@ function findLearnedAnswerFast(rawText, intent){
   console.log(`[learned-match] intent=${requestedIntent||"unknown"} confidence=${score.toFixed(2)} overlap=${overlap.toFixed(2)} support=${support}`);
   return {...best, _score:score, _support:support, _overlap:overlap};
 }
+async function findLearnedAnswerServerFast(rawText,intent){
+  try{
+    const r=await fetch(apiUrl("/api/learned-match"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:rawText,intent,callId})});
+    if(!r.ok) return null;
+    const d=await r.json();
+    if(!d || !d.hit || !d.answer) return null;
+    return {intent:d.intent||intent,question:d.question||rawText,answer:d.answer,_score:Number(d.score||0),_overlap:Number(d.overlap||0),_concept:Number(d.conceptOverlap||0),_reason:d.reason||"server"};
+  }catch(e){ return null; }
+}
 async function saveLearnedAnswerFast(question,intent,answer){
   if (!question || !intent || !answer) return;
   answer = compactSpokenReply(answer);
@@ -1579,12 +1588,16 @@ async function tryFastExtorRoute(rawText){
     "potassium","stopping","co_extor","bp_related"
   ]);
   if (learnedEligibleIntents.has(intent) && intent !== "side_effect_help"){
-    const learnedNow = findLearnedAnswerFast(rawText, intent);
+    // PostgreSQL is the source of truth. Ask the backend directly so learned
+    // knowledge works across calls, browsers, Wi-Fi networks and stale tabs.
+    let learnedNow = await findLearnedAnswerServerFast(rawText, intent);
+    if (!learnedNow) learnedNow = findLearnedAnswerFast(rawText, intent); // offline/local fallback only
     if (learnedNow && fastState.lastLearnedAnswerId !== `${learnedNow.intent}:${learnedNow.question}`){
       fastState.lastLearnedAnswerId = `${learnedNow.intent}:${learnedNow.question}`;
       fastState.learnedHits = (fastState.learnedHits||0)+1;
-      console.log(`[learned-answer] HIT intent=${intent} confidence=${learnedNow._score.toFixed(2)} overlap=${(learnedNow._overlap||0).toFixed(2)}: ${rawText}`);
-      markLearnedHitFast(learnedNow, rawText);
+      console.log(`[learned-answer] HIT intent=${intent} reason=${learnedNow._reason||"local"} confidence=${Number(learnedNow._score||0).toFixed(2)} overlap=${Number(learnedNow._overlap||0).toFixed(2)}: ${rawText}`);
+      // Server-side matches already increment hits atomically. Only mark local fallback hits here.
+      if (!learnedNow._reason) markLearnedHitFast(learnedNow, rawText);
       return fastSpeakResponse(learnedNow.answer, intent, {userText:rawText, source:"LEARNED_DB"}), true;
     }
   }
@@ -1599,14 +1612,15 @@ async function tryFastExtorRoute(rawText){
 
     // A nuanced/new side-effect question gets one proper Claude pass. Once
     // Claude answers it, that wording+answer is cached for future callers.
-    const learned = findLearnedAnswerFast(rawText, wantsMedicine ? "side_effect_medicine" : "side_effect_help");
+    let learned = await findLearnedAnswerServerFast(rawText, wantsMedicine ? "side_effect_medicine" : "side_effect_help");
+    if (!learned) learned = findLearnedAnswerFast(rawText, wantsMedicine ? "side_effect_medicine" : "side_effect_help");
     const nuanced = rawText.length > 55 || hasAnyFast(t,["why","kyun","کیوں","still","abhi bhi","ابھی بھی","bar bar","بار بار","continue","doesn't stop","nahi ruk","نہیں رک"]);
     if (learned && fastState.lastLearnedAnswerId !== learned.question){
       fastState.lastLearnedAnswerId = learned.question;
       fastState.lastAnswerKey = "learned:" + learned.question;
       fastState.learnedHits = (fastState.learnedHits||0)+1;
       console.log(`[learned-answer] HIT ${learned._score.toFixed(2)} overlap=${(learned._overlap||0).toFixed(2)}: ${rawText}`);
-      markLearnedHitFast(learned, rawText);
+      if (!learned._reason) markLearnedHitFast(learned, rawText);
       return fastSpeakResponse(learned.answer, "learned_side_effect", {userText:rawText, source:"LEARNED_DB"}), true;
     }
     if (nuanced && !(fastState.sideEffectCounts && fastState.sideEffectCounts[symptom||"general"])){
@@ -1678,12 +1692,13 @@ async function tryFastExtorRoute(rawText){
 
   // Unknown but clearly Extor-related: reuse a previously learned Claude
   // answer when the new question is genuinely similar; otherwise ask Claude.
-  const cachedUnknown = findLearnedAnswerFast(rawText, "unknown_extor");
+  let cachedUnknown = await findLearnedAnswerServerFast(rawText, "other_extor");
+  if (!cachedUnknown) cachedUnknown = findLearnedAnswerFast(rawText, "unknown_extor");
   if (cachedUnknown && fastState.lastLearnedAnswerId !== cachedUnknown.question){
     fastState.lastLearnedAnswerId = cachedUnknown.question;
     fastState.learnedHits = (fastState.learnedHits||0)+1;
     console.log(`[learned-answer] HIT ${cachedUnknown._score.toFixed(2)} overlap=${(cachedUnknown._overlap||0).toFixed(2)}: ${rawText}`);
-    markLearnedHitFast(cachedUnknown, rawText);
+    if (!cachedUnknown._reason) markLearnedHitFast(cachedUnknown, rawText);
     return fastSpeakResponse(cachedUnknown.answer, "learned_other_extor", {userText:rawText, source:"LEARNED_DB"}), true;
   }
   await logLearningFast(rawText, "unknown_extor", false, true, null, "CLAUDE_REQUEST");
@@ -2703,7 +2718,7 @@ async function beginCall(){
   responseCommittedTurn = 0;
   lastCommittedTranscript = "";
   lastCommittedTranscriptAt = 0;
-  refreshLearnedIntentPhrases();
+  await refreshLearnedIntentPhrases();
   callId = "call_" + Date.now() + "_" + Math.floor(Math.random()*100000);
   callStatus.textContent = "Live — connecting";
   callStatus.classList.add("live");
