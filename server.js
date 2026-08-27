@@ -12,7 +12,7 @@ const app = express();
 // appropriate for the demo. Lock this to your production domain later.
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-training-key");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
@@ -82,6 +82,8 @@ if (!fs.existsSync(LEARNED_ANSWERS_FILE)) fs.writeFileSync(LEARNED_ANSWERS_FILE,
 // database. If DATABASE_URL is absent (for local Mac testing), the agent
 // safely falls back to the legacy JSON files in /data.
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const TRAINING_IMPORT_KEY = process.env.TRAINING_IMPORT_KEY || "";
+const SUPERVISED_TRAINING_FILE = path.join(__dirname, "data", "sania_supervised_training_v1.json");
 const learningPool = DATABASE_URL ? new Pool({
   connectionString: DATABASE_URL,
   ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
@@ -128,6 +130,15 @@ async function initLearningDb(){
         source TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_sania_events_ts ON sania_learning_events(ts DESC);
+
+      CREATE TABLE IF NOT EXISTS sania_training_packs (
+        version TEXT PRIMARY KEY,
+        checksum TEXT,
+        records_total INTEGER NOT NULL DEFAULT 0,
+        answers_imported INTEGER NOT NULL DEFAULT 0,
+        phrases_imported INTEGER NOT NULL DEFAULT 0,
+        imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
     learningDbReady = true;
     console.log('[learning-db] PostgreSQL READY — learning is persistent/global');
@@ -171,7 +182,7 @@ const CANONICAL_LEARN_INTENTS = new Set([
   "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine",
   "other_medicines","missed_dose","how_to_take","timing","food","pregnancy","breastfeeding",
   "kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","price",
-  "competitor","purchase","precautions","bp_related","other_extor"
+  "competitor","purchase","precautions","bp_related","alcohol","monitoring","effectiveness","onset","storage","refill","travel","other_extor"
 ]);
 
 function normalizeIntentName(value){
@@ -214,6 +225,13 @@ function inferLearningIntent(text, proposedIntent){
   const symptom=hasLearnAny(t,["chakkar","dizziness","dizzy","swelling","soojan","سوجن","headache","سر درد","weakness","کمزوری","nausea","متلی","palpitation","دھڑکن"]);
   if(symptom && hasLearnAny(t,["mujhe","مجھے","having","feel","feeling","ho raha","ہو رہا","what should","kya kar","کیا کروں"])) return "side_effect_help";
   if(hasLearnAny(t,["side effect","side effects","سائیڈ ایفیکٹ","نقصان"])) return "side_effects";
+  if(hasLearnAny(t,["alcohol","drink alcohol","شراب","sharab"])) return "alcohol";
+  if(hasLearnAny(t,["monitor","monitoring","check bp","bp check","blood pressure check","کتنی بار چیک","مانیٹر"])) return "monitoring";
+  if(hasLearnAny(t,["effective","effectiveness","working","work kar","اثر کر","کام کر","bp control"])) return "effectiveness";
+  if(hasLearnAny(t,["how long to work","how quickly","start working","effect start","اثر کب","کتنی دیر میں اثر","onset"])) return "onset";
+  if(hasLearnAny(t,["store","storage","keep medicine","room temperature","fridge","refrigerator","محفوظ رکھ","کہاں رکھ"])) return "storage";
+  if(hasLearnAny(t,["refill","repeat prescription","next pack","دوبارہ نسخہ","ریفل"])) return "refill";
+  if(hasLearnAny(t,["travel","travelling","flight","airport","سفر","جہاز"])) return "travel";
   if(hasLearnAny(t,["stop extor","stop taking","band kar","بند کر","چھوڑ دوں","چھوڑ سکتا","چھوڑ سکتی"])) return "stopping";
   if(hasLearnAny(t,["co extor","co-extor","کو ایکسٹور"])) return "co_extor";
   if(hasLearnAny(t,["overdose","too many tablets","extra tablets","زیادہ گولیاں","زیادہ خوراک"])) return "overdose";
@@ -323,7 +341,7 @@ app.post("/api/learn", async (req, res) => {
 
   const APPROVED_LEARN_INTENTS = new Set([
     "what_is","strengths","dose_frequency","side_effects","side_effect_help","side_effect_medicine","other_medicines","missed_dose","how_to_take","timing",
-    "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase","price","competitor","precautions","bp_related"
+    "food","pregnancy","breastfeeding","kidney_liver","potassium","under18","stopping","co_extor","overdose","emergency","purchase","price","competitor","precautions","bp_related","alcohol","monitoring","effectiveness","onset","storage","refill","travel"
   ]);
   if (safe.matched && APPROVED_LEARN_INTENTS.has(safe.intent) && safe.text.length >= 3) {
     await addLearnedPhrase(safe.intent, safe.text);
@@ -342,7 +360,7 @@ function normalizeLearnText(value) {
 // and only for a small approved set of general Extor intents.
 app.post("/api/learn-answer", async (req, res) => {
   const body = req.body || {};
-  const allowed = new Set(["what_is", "strengths", "dose_frequency", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "price", "competitor", "purchase", "precautions", "bp_related", "other_extor"]);
+  const allowed = new Set(["what_is", "strengths", "dose_frequency", "side_effect_help", "side_effects", "side_effect_medicine", "other_medicines", "timing", "food", "missed_dose", "how_to_take", "pregnancy", "breastfeeding", "kidney_liver", "potassium", "under18", "stopping", "co_extor", "overdose", "emergency", "price", "competitor", "purchase", "precautions", "bp_related", "alcohol", "monitoring", "effectiveness", "onset", "storage", "refill", "travel", "other_extor"]);
   const question = normalizeLearnText(body.question).slice(0, 500);
   const intent = inferLearningIntent(question, body.intent);
   const answer = String(body.answer || "").replace(/<state>[\s\S]*?<\/state>/g, "").trim().slice(0, 700);
@@ -459,6 +477,12 @@ app.post("/api/learned-match", async (req,res)=>{
     let intent=String(req.body?.intent||"").trim();
     if(intent==="unknown_extor") intent="other_extor";
     if(!question||!intent) return res.status(400).json({ok:false,error:"question and intent required"});
+    // If the browser only knows this is an Extor question, let the server use
+    // the complete utterance to promote it into a supervised/specific intent.
+    if(intent==="other_extor"){
+      const inferred = inferLearningIntent(question, null);
+      if(inferred && inferred!=="other_extor") intent=inferred;
+    }
     let rows=[];
     if(learningPool){
       const q=await learningPool.query(`SELECT intent,question,answer,hits,updated_at AS "updatedAt" FROM sania_learned_answers WHERE intent=$1 ORDER BY hits DESC, updated_at DESC LIMIT 100`,[intent]);
@@ -500,6 +524,75 @@ app.post("/api/learned-hit", async (req,res) => {
     console.log(`[learned-hit] intent=${intent} question="${question.slice(0,100)}" current="${currentText.slice(0,100)}"`);
     return res.json({ok:true,storage:learningDbReady?"postgres":"json"});
   }catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+});
+
+
+function trainingAuthorized(req){
+  return !!TRAINING_IMPORT_KEY && String(req.get("x-training-key")||"") === TRAINING_IMPORT_KEY;
+}
+function loadSupervisedTrainingPack(){
+  const raw=fs.readFileSync(SUPERVISED_TRAINING_FILE,"utf8");
+  return JSON.parse(raw);
+}
+app.get("/api/training-pack-info", async (req,res)=>{
+  try{
+    const pack=loadSupervisedTrainingPack();
+    let imported=null;
+    if(await dbIsReady()){
+      const q=await learningPool.query(`SELECT version,checksum,records_total AS "recordsTotal",answers_imported AS "answersImported",phrases_imported AS "phrasesImported",imported_at AS "importedAt" FROM sania_training_packs WHERE version=$1`,[pack.version]);
+      imported=q.rows[0]||null;
+    }
+    const modes=(pack.records||[]).reduce((a,r)=>{a[r.mode||"answer"]=(a[r.mode||"answer"]||0)+1;return a;},{});
+    const intents=(pack.records||[]).reduce((a,r)=>{a[r.intent]=(a[r.intent]||0)+1;return a;},{});
+    res.json({ok:true,version:pack.version,checksum:pack.checksum,records:(pack.records||[]).length,modes,intents,imported,storage:learningDbReady?"postgres":"json"});
+  }catch(e){res.status(500).json({ok:false,error:e.message});}
+});
+app.post("/api/admin/import-supervised-training", async (req,res)=>{
+  if(!trainingAuthorized(req)) return res.status(401).json({ok:false,error:"invalid training key"});
+  if(!(await dbIsReady())) return res.status(503).json({ok:false,error:"PostgreSQL required for supervised import"});
+  try{
+    const pack=loadSupervisedTrainingPack();
+    const dryRun=!!req.body?.dryRun;
+    const stats={version:pack.version,recordsTotal:0,answersImported:0,phrasesImported:0,phraseOnly:0,skipped:0};
+    for(const r of (pack.records||[])){
+      const q=normalizeLearnText(r.question).slice(0,500);
+      const intent=normalizeIntentName(r.intent);
+      const answer=String(r.answer||"").replace(/<state>[\s\S]*?<\/state>/g,"").trim().slice(0,700);
+      if(!q || !CANONICAL_LEARN_INTENTS.has(intent) || looksLikeChitChatForLearning(q)){stats.skipped++;continue;}
+      stats.recordsTotal++;
+      if(!dryRun){
+        await learningPool.query(`INSERT INTO sania_learned_phrases(intent,phrase) VALUES($1,$2) ON CONFLICT(intent,phrase) DO NOTHING`,[intent,q]);
+      }
+      stats.phrasesImported++;
+      if(String(r.mode||"answer")==="phrase_only"){stats.phraseOnly++;continue;}
+      if(answer.length<8){stats.skipped++;continue;}
+      if(!dryRun){
+        await learningPool.query(
+          `INSERT INTO sania_learned_answers(intent,question,answer,hits,updated_at)
+           VALUES($1,$2,$3,0,NOW())
+           ON CONFLICT(intent,question) DO UPDATE SET
+             answer=EXCLUDED.answer,
+             hits=sania_learned_answers.hits,
+             updated_at=NOW()`,
+          [intent,q,answer]
+        );
+      }
+      stats.answersImported++;
+    }
+    if(!dryRun){
+      await learningPool.query(
+        `INSERT INTO sania_training_packs(version,checksum,records_total,answers_imported,phrases_imported,imported_at)
+         VALUES($1,$2,$3,$4,$5,NOW())
+         ON CONFLICT(version) DO UPDATE SET checksum=EXCLUDED.checksum,records_total=EXCLUDED.records_total,
+         answers_imported=EXCLUDED.answers_imported,phrases_imported=EXCLUDED.phrases_imported,imported_at=NOW()`,
+        [pack.version,pack.checksum||"",stats.recordsTotal,stats.answersImported,stats.phrasesImported]
+      );
+      console.log(`[supervised-training] IMPORTED version=${pack.version} answers=${stats.answersImported} phrases=${stats.phrasesImported} phraseOnly=${stats.phraseOnly}`);
+    }else{
+      console.log(`[supervised-training] DRY RUN version=${pack.version} answers=${stats.answersImported} phrases=${stats.phrasesImported}`);
+    }
+    res.json({ok:true,dryRun,storage:"postgres",...stats});
+  }catch(e){console.error("[supervised-training] failed",e);res.status(500).json({ok:false,error:e.message});}
 });
 
 app.post("/api/learning/reclassify", async (req,res) => {
