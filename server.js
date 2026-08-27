@@ -83,7 +83,7 @@ if (!fs.existsSync(LEARNED_ANSWERS_FILE)) fs.writeFileSync(LEARNED_ANSWERS_FILE,
 // safely falls back to the legacy JSON files in /data.
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const TRAINING_IMPORT_KEY = process.env.TRAINING_IMPORT_KEY || "";
-const SUPERVISED_TRAINING_FILE = path.join(__dirname, "data", "sania_supervised_training_v1.json");
+const SUPERVISED_TRAINING_FILE = path.join(__dirname, "data", "sania_supervised_training_urdu_v2.json");
 const learningPool = DATABASE_URL ? new Pool({
   connectionString: DATABASE_URL,
   ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
@@ -211,39 +211,39 @@ function looksLikeChitChatForLearning(text){
 function inferLearningIntent(text, proposedIntent){
   const t=learningText(text); const proposed=normalizeIntentName(proposedIntent);
   // Strong topic-first rules. These always outrank a generic proposed intent.
-  if(hasLearnAny(t,["kidney","kidneys","renal","گردے","گردہ","گردوں","gurday","gurda"])) return "kidney_liver";
-  if(hasLearnAny(t,["liver","hepatic","جگر","jigar"])) return "kidney_liver";
-  if(hasLearnAny(t,["pregnant","pregnancy","حمل","حاملہ","hamal"])) return "pregnancy";
+  if(hasLearnAny(t,["kidney","kidneys","renal","گردے","گردہ","گردوں","گردوں کا","گردے کا مسئلہ"])) return "kidney_liver";
+  if(hasLearnAny(t,["liver","hepatic","جگر","جگر کا مسئلہ","جگر کی بیماری"])) return "kidney_liver";
+  if(hasLearnAny(t,["pregnant","pregnancy","حمل","حاملہ","حمل کا ارادہ","حمل کا شک"])) return "pregnancy";
   if(hasLearnAny(t,["breastfeed","breastfeeding","دودھ پلا","feeding baby","nursing"])) return "breastfeeding";
   if(hasLearnAny(t,["potassium","پوٹاشیم"])) return "potassium";
   if(hasLearnAny(t,["under 18","under18","18 years","18 سال","child","children","teen","بچہ","بچوں"])) return "under18";
-  if(hasLearnAny(t,["twice","twice a day","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو دفعہ","دو گولی","دو گولیاں","دن میں دو","ایک دن میں دو"])) return "dose_frequency";
-  if(hasLearnAny(t,["price","cost","rate","قیمت","دام","روپے","pkr","kitne ki","kitni ki","کتنے کی","کتنی کی"])) return "price";
-  if(hasLearnAny(t,["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus","better","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valtec","متبادل","مقابلہ"])) return "competitor";
-  if(hasLearnAny(t,["missed dose","miss dose","dose miss","bhool","بھول"])) return "missed_dose";
-  if(hasLearnAny(t,["panadol","paracetamol","ibuprofen","brufen","other medicine","another medicine","koi aur dawa","ساتھ کون سی دوا","interaction","ساتھ لے","ساتھ لوں"])) return "other_medicines";
+  if(hasLearnAny(t,["twice","twice a day","two times","2 times","2 tablets","two tablets","double dose","دو بار","دو دفعہ","دو مرتبہ","دو گولی","دو گولیاں","دن میں دو","ایک دن میں دو","دوسری گولی","اضافی گولی","خوراک بڑھا"])) return "dose_frequency";
+  if(hasLearnAny(t,["price","cost","rate","قیمت","دام","روپے","ریٹ","کتنے کی","کتنی کی","قیمت کیا","پیک کی قیمت","ایک گولی کتنے"])) return "price";
+  if(hasLearnAny(t,["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus","better","متبادل","مقابلہ","موازنہ","دوسرا برانڈ","دوسری کمپنی","ایکسفورج","اوسر","اوسار","املورٹن","ایمسٹین","ڈائیوپلس","نیو ڈے","ویلام","ویلٹیک"])) return "competitor";
+  if(hasLearnAny(t,["missed dose","miss dose","dose miss","بھول","خوراک بھول","گولی رہ گئی","خوراک رہ گئی","وقت گزر گیا"])) return "missed_dose";
+  if(hasLearnAny(t,["panadol","paracetamol","ibuprofen","brufen","پیناڈول","پیراسیٹامول","آئیبوپروفین","بروفن","دوسری دوا","کوئی اور دوا","ساتھ کون سی دوا","باہمی اثر","ساتھ لے","ساتھ لوں","ایک ساتھ دوا"])) return "other_medicines";
   const symptom=hasLearnAny(t,["chakkar","dizziness","dizzy","swelling","soojan","سوجن","headache","سر درد","weakness","کمزوری","nausea","متلی","palpitation","دھڑکن"]);
   if(symptom && hasLearnAny(t,["mujhe","مجھے","having","feel","feeling","ho raha","ہو رہا","what should","kya kar","کیا کروں"])) return "side_effect_help";
-  if(hasLearnAny(t,["side effect","side effects","سائیڈ ایفیکٹ","نقصان"])) return "side_effects";
+  if(hasLearnAny(t,["side effect","side effects","سائیڈ ایفیکٹ","سائیڈ ایفیکٹس","مضر اثرات","نقصان","نقصانات"])) return "side_effects";
   if(hasLearnAny(t,["alcohol","drink alcohol","شراب","sharab"])) return "alcohol";
-  if(hasLearnAny(t,["monitor","monitoring","check bp","bp check","blood pressure check","کتنی بار چیک","مانیٹر"])) return "monitoring";
-  if(hasLearnAny(t,["effective","effectiveness","working","work kar","اثر کر","کام کر","bp control"])) return "effectiveness";
-  if(hasLearnAny(t,["how long to work","how quickly","start working","effect start","اثر کب","کتنی دیر میں اثر","onset"])) return "onset";
-  if(hasLearnAny(t,["store","storage","keep medicine","room temperature","fridge","refrigerator","محفوظ رکھ","کہاں رکھ"])) return "storage";
-  if(hasLearnAny(t,["refill","repeat prescription","next pack","دوبارہ نسخہ","ریفل"])) return "refill";
-  if(hasLearnAny(t,["travel","travelling","flight","airport","سفر","جہاز"])) return "travel";
-  if(hasLearnAny(t,["stop extor","stop taking","band kar","بند کر","چھوڑ دوں","چھوڑ سکتا","چھوڑ سکتی"])) return "stopping";
+  if(hasLearnAny(t,["monitor","monitoring","check bp","bp check","blood pressure check","کتنی بار چیک","مانیٹر","بلڈ پریشر کتنی بار","پریشر کی نگرانی","ریڈنگ کا ریکارڈ"])) return "monitoring";
+  if(hasLearnAny(t,["effective","effectiveness","working","اثر کر","کام کر","فائدہ","اثر ہو رہا","بلڈ پریشر کنٹرول"])) return "effectiveness";
+  if(hasLearnAny(t,["how long to work","how quickly","start working","effect start","اثر کب","اثر کب شروع","کتنی دیر میں اثر","کتنا وقت لگتا","onset"])) return "onset";
+  if(hasLearnAny(t,["store","storage","keep medicine","room temperature","fridge","refrigerator","محفوظ رکھ","کہاں رکھ","فریج","گرمی سے بچا","اصل پیک"])) return "storage";
+  if(hasLearnAny(t,["refill","repeat prescription","next pack","دوبارہ نسخہ","ریفل","اگلا پیک","دوا ختم ہونے"])) return "refill";
+  if(hasLearnAny(t,["travel","travelling","flight","airport","سفر","جہاز","فلائٹ","سفر میں دوا"])) return "travel";
+  if(hasLearnAny(t,["stop extor","stop taking","بند کر","دوا بند","چھوڑ دوں","چھوڑ سکتا","چھوڑ سکتی","اچانک بند"])) return "stopping";
   if(hasLearnAny(t,["co extor","co-extor","کو ایکسٹور"])) return "co_extor";
   if(hasLearnAny(t,["overdose","too many tablets","extra tablets","زیادہ گولیاں","زیادہ خوراک"])) return "overdose";
   if(hasLearnAny(t,["chest pain","سینے میں درد","difficulty breathing","سانس","faint","بے ہوش"])) return "emergency";
   if(hasLearnAny(t,["5/80","5 80","5/160","5 160","10/160","10 160","strength","power","variation","variant","طاقت","ورائٹی"])) return "strengths";
-  if(hasLearnAny(t,["with food","without food","empty stomach","khane","کھانے","خالی پیٹ"])) return "food";
-  if(hasLearnAny(t,["what time","when should","kab","کس وقت","کب لوں","morning","evening","night","صبح","شام","رات"])) return "timing";
-  if(hasLearnAny(t,["how to take","how should i take","kaise loon","کیسے لوں","water","pani","پانی","milk","doodh","دودھ"])) return "how_to_take";
-  if(hasLearnAny(t,["where can i buy","where to buy","pharmacy","medical store","کہاں ملے","فارمیسی","خرید"])) return "purchase";
-  if(hasLearnAny(t,["bp","blood pressure","بلڈ پریشر","پریشر"]) && hasLearnAny(t,["high","low","normal","زیادہ","کم","نارمل"])) return "bp_related";
+  if(hasLearnAny(t,["with food","without food","empty stomach","کھانے","کھانا","خالی پیٹ","کھانے سے پہلے","کھانے کے بعد","کھانے کے ساتھ"])) return "food";
+  if(hasLearnAny(t,["what time","when should","کس وقت","کب لوں","کب لینی","صبح","شام","رات","روز ایک ہی وقت"])) return "timing";
+  if(hasLearnAny(t,["how to take","how should i take","کیسے لوں","کیسے لینی","پانی","دودھ","پوری نگل","توڑ سکتے","چبا سکتے","صحیح طریقہ"])) return "how_to_take";
+  if(hasLearnAny(t,["where can i buy","where to buy","pharmacy","medical store","کہاں ملے","فارمیسی","میڈیکل اسٹور","خرید","کہاں سے مل"])) return "purchase";
+  if(hasLearnAny(t,["bp","blood pressure","بلڈ پریشر","بی پی","پریشر"]) && hasLearnAny(t,["high","low","normal","زیادہ","کم","نارمل"])) return "bp_related";
   if(hasLearnAny(t,["احتیاط","ehtiyat","precaution","precautions","caution","safe to use","is it safe","کیا محفوظ","محفوظ ہے"])) return "precautions";
-  if(hasLearnAny(t,["what is extor","extor kya hai","ایکسٹور کیا ہے","used for","kis liye","کس لیے"])) return "what_is";
+  if(hasLearnAny(t,["what is extor","ایکسٹور کیا ہے","used for","کس لیے","کس کام","کیوں دی جاتی","کون سے اجزا"])) return "what_is";
   // A specific Claude intent is allowed if it is in the canonical list. Generic
   // other_extor never overrides the full-question rules above.
   if(proposed && proposed!=="other_extor" && CANONICAL_LEARN_INTENTS.has(proposed)) return proposed;
@@ -400,8 +400,8 @@ function lmNorm(v){
 function lmCanon(w){
   const x=String(w||"").toLowerCase();
   const groups={
-    strength:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","ورائٹی"],
-    dose:["dose","dosage","خوراک"], twice:["twice","2","two","do","دو","بار","دفعہ"],
+    strength:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","پاور","مقدار","ورائٹی"],
+    dose:["dose","dosage","خوراک","گولی","مقدار"], twice:["twice","2","two","دو","بار","دفعہ","مرتبہ","اضافی"],
     food:["food","khana","khane","کھانا","کھانے"], water:["water","pani","پانی"], milk:["milk","doodh","دودھ"],
     miss:["miss","missed","bhool","بھول"], kidney:["kidney","kidneys","renal","gurda","gurday","گردہ","گردے"],
     liver:["liver","hepatic","jigar","جگر"], pregnant:["pregnant","pregnancy","hamal","حمل","حاملہ"],
@@ -409,8 +409,8 @@ function lmCanon(w){
     headache:["headache","sar","sir","سر","درد"], nausea:["nausea","متلی","matli"],
     panadol:["panadol","paracetamol","acetaminophen"], ibuprofen:["ibuprofen","brufen","nsaid","nsaids"],
     aspirin:["aspirin"], potassium:["potassium","پوٹاشیم"], stop:["stop","stopping","band","بند","چھوڑ"],
-    price:["price","cost","rate","قیمت","دام","pkr","روپے"], competitor:["competitor","alternative","substitute","compare","comparison","versus","exforge","avsar","amlortan","amstan","dioplus","newday","valam"],
-    bp:["bp","blood","pressure","بلڈ","پریشر"]
+    price:["price","cost","rate","قیمت","دام","pkr","روپے"], competitor:["competitor","alternative","substitute","compare","comparison","versus","متبادل","مقابلہ","موازنہ","برانڈ","ایکسفورج","اوسر","اوسار","املورٹن","ایمسٹین","ڈائیوپلس","نیو ڈے","ویلام"],
+    bp:["bp","blood","pressure","بلڈ","بی","پریشر"]
   };
   for(const [k,a] of Object.entries(groups)) if(a.includes(x)) return k;
   return x;
@@ -437,9 +437,9 @@ function lmConcepts(v){
     dizziness:["dizzy","dizziness","chakkar","چکر"], swelling:["swelling","soojan","سوجن"], headache:["headache","sar dard","sir dard","سر درد"], nausea:["nausea","matli","متلی"],
     panadol:["panadol","paracetamol","acetaminophen"], ibuprofen:["ibuprofen","brufen"], aspirin:["aspirin"], potassium:["potassium","پوٹاشیم"],
     twice:["twice","two times","2 times","2 tablets","two tablets","do baar","2 baar","دو بار","دو دفعہ","دو گولی","دن میں دو"],
-    missed:["missed dose","miss dose","dose miss","bhool","بھول"], food:["food","khana","khane","کھانا","کھانے","empty stomach","خالی پیٹ"],
+    missed:["missed dose","miss dose","dose miss","بھول","خوراک بھول","گولی رہ گئی","خوراک رہ گئی","وقت گزر گیا"], food:["food","khana","khane","کھانا","کھانے","empty stomach","خالی پیٹ"],
     liquid:["water","pani","پانی","milk","doodh","دودھ"], strengths:["5/80","5 80","5/160","5 160","10/160","10 160","strength","power","variation","طاقت"],
-    price:["price","cost","rate","قیمت","دام","pkr","روپے"], competitor:["competitor","alternative","substitute","compare","comparison","versus","exforge","avsar","amlortan","amstan","dioplus","newday","valam"],
+    price:["price","cost","rate","قیمت","دام","pkr","روپے"], competitor:["competitor","alternative","substitute","compare","comparison","versus","متبادل","مقابلہ","موازنہ","برانڈ","ایکسفورج","اوسر","اوسار","املورٹن","ایمسٹین","ڈائیوپلس","نیو ڈے","ویلام"],
     stop:["stop","stopping","band","بند","چھوڑ"], bp:["bp","blood pressure","بلڈ پریشر"]
   };
   for(const [k,a] of Object.entries(rules)) if(a.some(x=>t.includes(x))) out.add(k);
@@ -544,7 +544,7 @@ app.get("/api/training-pack-info", async (req,res)=>{
     }
     const modes=(pack.records||[]).reduce((a,r)=>{a[r.mode||"answer"]=(a[r.mode||"answer"]||0)+1;return a;},{});
     const intents=(pack.records||[]).reduce((a,r)=>{a[r.intent]=(a[r.intent]||0)+1;return a;},{});
-    res.json({ok:true,version:pack.version,checksum:pack.checksum,records:(pack.records||[]).length,modes,intents,imported,storage:learningDbReady?"postgres":"json"});
+    res.json({ok:true,version:pack.version,checksum:pack.checksum,records:(pack.records||[]).length,modes,intents,language:pack.policy?.trainingLanguage||null,legacyRecords:(pack.legacyRecords||[]).length,imported,storage:learningDbReady?"postgres":"json"});
   }catch(e){res.status(500).json({ok:false,error:e.message});}
 });
 app.post("/api/admin/import-supervised-training", async (req,res)=>{
@@ -553,7 +553,20 @@ app.post("/api/admin/import-supervised-training", async (req,res)=>{
   try{
     const pack=loadSupervisedTrainingPack();
     const dryRun=!!req.body?.dryRun;
-    const stats={version:pack.version,recordsTotal:0,answersImported:0,phrasesImported:0,phraseOnly:0,skipped:0};
+    const replaceLegacy=!!req.body?.replaceLegacy;
+    const stats={version:pack.version,recordsTotal:0,answersImported:0,phrasesImported:0,phraseOnly:0,skipped:0,legacyAnswersRemoved:0,legacyPhrasesRemoved:0};
+    if(replaceLegacy){
+      for(const oldRow of (pack.legacyRecords||[])){
+        const oldQ=normalizeLearnText(oldRow.question).slice(0,500);
+        if(!oldQ) continue;
+        if(!dryRun){
+          const da=await learningPool.query(`DELETE FROM sania_learned_answers WHERE question=$1`,[oldQ]);
+          const dp=await learningPool.query(`DELETE FROM sania_learned_phrases WHERE phrase=$1`,[oldQ]);
+          stats.legacyAnswersRemoved += Number(da.rowCount||0);
+          stats.legacyPhrasesRemoved += Number(dp.rowCount||0);
+        }
+      }
+    }
     for(const r of (pack.records||[])){
       const q=normalizeLearnText(r.question).slice(0,500);
       const intent=normalizeIntentName(r.intent);
