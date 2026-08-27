@@ -677,7 +677,7 @@ function normFast(s){
 function hasAnyFast(t, list){ return list.some(x => t.includes(x)); }
 function canonicalTokenFast(w){
   const groups={
-    strength:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","ورائٹی"],
+    strength:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","پاور","مقدار","ورائٹی"],
     where:["where","kahan","کہاں"],
     buy:["buy","purchase","pharmacy","store","خرید","فارمیسی"],
     timing:["when","kab","time","timing","waqt","کب","وقت"],
@@ -992,22 +992,22 @@ function progressiveSideEffectAnswerFast(symptom, wantsMedicine){
 // lookup.
 const INTENT_SIGNAL_RULES = {
   dose_frequency: {
-    topic:["twice","twice a day","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو دفعہ","2 گولی","دو گولی","دو گولیاں","din mein 2","din mein do","دن میں دو","ایک دن میں دو","روز دو"],
+    topic:["twice","twice a day","two times","2 times","2 tablets","two tablets","double dose","do baar","2 baar","دو بار","دو دفعہ","دو مرتبہ","2 گولی","دو گولی","دو گولیاں","دن میں دو","ایک دن میں دو","روز دو","دوسری گولی","اضافی گولی"],
     action:["can i","should i","kya main","کیا میں","le sakta","le sakti","لے سکتا","لے سکتی","take","lena","لوں","لینا","kitni baar","how many times","کتنی بار"],
     context:["extor","ایکسٹور","tablet","goli","گولی","dose","خوراک","medicine","دوا"]
   },
   strengths: {
-    topic:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","ورائٹی","5/80","5 80","5/160","5 160","10/160","10 160"],
+    topic:["strength","strengths","power","powers","variation","variations","variant","variants","طاقت","پاور","مقدار","ورائٹی","5/80","5 80","5/160","5 160","10/160","10 160"],
     action:["what","which","how many","available","different","difference","kitni","kis kis","kin","کون","کتنی","کیا"],
     context:["extor","ایکسٹور","amlodipine","valsartan","mg","dose","tablet","goli","گولی"]
   },
   price: {
-    topic:["price","prices","cost","rate","قیمت","دام","روپے","rs","pkr","kitne ki","kitni ki","کتنے کی","کتنی کی"],
+    topic:["price","prices","cost","rate","قیمت","دام","ریٹ","روپے","rs","pkr","کتنے کی","کتنی کی","پیک کی قیمت"],
     action:["what","how much","kitna","kitni","کیا","کتنا","کتنی","tell","bata","بتا"],
     context:["extor","ایکسٹور","5/80","5 80","5/160","5 160","10/160","10 160","pack","strip","tablet","گولی"]
   },
   competitor: {
-    topic:["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus"," vs ","better","best","متبادل","مقابلہ","فرق","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valsar-m","valtan","valtec"],
+    topic:["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus"," vs ","better","best","متبادل","مقابلہ","موازنہ","دوسرا برانڈ","دوسری کمپنی","فرق","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valsar-m","valtan","valtec","ایکسفورج","اوسر","اوسار","املورٹن","ایمسٹین","ڈائیوپلس","نیو ڈے","ویلام"],
     action:["which","what","why","compare","difference","better","best","konsa","kaunsa","کیوں","کون سا","فرق"],
     context:["extor","ایکسٹور","amlodipine","valsartan","brand","medicine","دوا"]
   },
@@ -1027,7 +1027,7 @@ const INTENT_SIGNAL_RULES = {
     context:["take","len","lena","leni","لیں","extor","ایکسٹور","tablet","دوا"]
   },
   missed_dose: {
-    topic:["miss","missed","bhool","بھول","dose reh","خوراک رہ"],
+    topic:["miss","missed","bhool","بھول","dose reh","خوراک رہ","گولی رہ گئی","خوراک رہ گئی","وقت گزر گیا"],
     action:["what do","what should","kya kar","کیا کر","if","agar","اگر"],
     context:["dose","خوراک","extor","ایکسٹور","tablet","goli","گولی"]
   },
@@ -1037,12 +1037,12 @@ const INTENT_SIGNAL_RULES = {
     context:["extor","ایکسٹور","medicine","dawa","دوا","tablet","goli"]
   },
   side_effects: {
-    topic:["side effect","side effects","سائیڈ ایفیکٹ","سائیڈ ایفیکٹس","nuksan","nuqsan","نقصان","نقصانات"],
+    topic:["side effect","side effects","سائیڈ ایفیکٹ","سائیڈ ایفیکٹس","مضر اثرات","nuksan","nuqsan","نقصان","نقصانات"],
     action:["what","which","tell","bata","بتا","kon se","kaun se","کون سے","kya","کیا"],
     context:["extor","ایکسٹور","medicine","dawa","دوا","tablet"]
   },
   other_medicines: {
-    topic:["other medicine","other medicines","another medicine","koi aur medicine","koi aur medicines","koi aur dawa","dusri medicine","doosri medicine","اور دوا","کوئی اور دوا","اور میڈیسن","کوئی اور میڈیسن","دوسری دوا","دوسری میڈیسن","interaction","ساتھ کون سی دوا","ساتھ کون سی میڈیسن"],
+    topic:["other medicine","other medicines","another medicine","koi aur medicine","koi aur medicines","koi aur dawa","dusri medicine","doosri medicine","اور دوا","کوئی اور دوا","دوسری دوا","باہمی اثر","ایک ساتھ دوا","ساتھ کون سی دوا","ساتھ کون سی میڈیسن","پیناڈول","پیراسیٹامول","آئیبوپروفین","بروفن"],
     action:["can i take","can take","what can i take","kya le","kya main le","لے سکتا","لے سکتی","کیا لے","کیا میں لے","saath","ساتھ"],
     context:["extor","ایکسٹور","with extor","ساتھ"]
   },
@@ -1057,7 +1057,7 @@ const INTENT_SIGNAL_RULES = {
     context:["extor","ایکسٹور","amlodipine","valsartan","bp medicine","بلڈ پریشر کی دوا"]
   },
   kidney_liver: {
-    topic:["kidney","kidneys","renal","گردہ","گردے","gurda","gurday","liver","hepatic","جگر","jigar"],
+    topic:["kidney","kidneys","renal","گردہ","گردے","گردوں","گردوں کا مسئلہ","gurda","gurday","liver","hepatic","جگر","جگر کا مسئلہ","jigar"],
     action:["safe","safety","precaution","precautions","ehtiyat","احتیاط","can i","kya main","کیا میں","issue","problem","مسئلہ"],
     context:["extor","ایکسٹور","medicine","dawa","دوا","tablet"]
   },
@@ -1182,15 +1182,15 @@ function detectExtorIntentFast(t){
 
   // Explicit dose-frequency / extra-tablet questions outrank strengths.
   // Examples: "can I take it twice a day?", "din mein 2 goli le sakta hoon?"
-  if (hasAnyFast(t,["twice a day","twice","two times","2 times","2 tablets","two tablets","do baar","2 baar","دو بار","دو دفعہ","دو گولی","دو گولیاں","din mein 2","din mein do","دن میں دو","ایک دن میں دو","روز دو"]) &&
+  if (hasAnyFast(t,["twice a day","twice","two times","2 times","2 tablets","two tablets","do baar","2 baar","دو بار","دو دفعہ","دو مرتبہ","دو گولی","دو گولیاں","دن میں دو","ایک دن میں دو","روز دو","دوسری گولی","اضافی گولی"]) &&
       hasAnyFast(t,["take","lena","leni","loun","loon","لوں","لینا","لے سکتا","لے سکتی","goli","گولی","tablet","dose","خوراک"])) return "dose_frequency";
 
   // Commercial questions: explicit price/comparison wording should not drift
   // into purchase or strengths. They still require the current question to
   // contain actual price/comparison evidence.
-  if (hasAnyFast(t,["price","prices","cost","rate","قیمت","دام","روپے","pkr","kitne ki","kitni ki","کتنے کی","کتنی کی"]) &&
+  if (hasAnyFast(t,["price","prices","cost","rate","قیمت","دام","ریٹ","روپے","pkr","کتنے کی","کتنی کی","پیک کی قیمت"]) &&
       hasAnyFast(t,["extor","ایکسٹور","5/80","5 80","5/160","5 160","10/160","10 160","pack","strip","tablet","گولی"])) return "price";
-  if (hasAnyFast(t,["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus","better","best","متبادل","مقابلہ","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valsar-m","valtan","valtec"]) &&
+  if (hasAnyFast(t,["competitor","competition","alternative","alternatives","substitute","substitutes","compare","comparison","versus","better","best","متبادل","مقابلہ","موازنہ","دوسرا برانڈ","دوسری کمپنی","exforge","avsar","amlortan","amstan","dioplus","newday","valam","valsar-m","valtan","valtec","ایکسفورج","اوسر","اوسار","املورٹن","ایمسٹین","ڈائیوپلس","نیو ڈے","ویلام"]) &&
       hasAnyFast(t,["extor","ایکسٹور","brand","medicine","دوا","amlodipine","valsartan"])) return "competitor";
 
   // First use multi-signal matching. A fast answer is selected only when at
@@ -1234,7 +1234,7 @@ function detectExtorIntentFast(t){
   if (hasAnyFast(t,["with food or without food","کھانے کے ساتھ یا بغیر","empty stomach or after food"])) return "food";
   if (hasAnyFast(t,["when should i take extor","what time should i take extor","ایکسٹور کس وقت لوں","ایکسٹور کب لوں"])) return "timing";
   if (hasAnyFast(t,["how should i take extor","how to take extor","ایکسٹور کیسے لوں"])) return "how_to_take";
-  if (hasAnyFast(t,["kidney","kidneys","renal","گردے","گردہ","gurda","gurday","liver","hepatic","جگر","jigar"]) && mentionsExtorFast(t)) return "kidney_liver";
+  if (hasAnyFast(t,["kidney","kidneys","renal","گردے","گردہ","گردوں","گردوں کا مسئلہ","liver","hepatic","جگر","جگر کا مسئلہ"]) && mentionsExtorFast(t)) return "kidney_liver";
   if (hasAnyFast(t,["pregnant","pregnancy","حمل","حاملہ","hamal"]) && mentionsExtorFast(t)) return "pregnancy";
   if (hasAnyFast(t,["breastfeed","breastfeeding","feeding baby","nursing","دودھ پلا"]) && mentionsExtorFast(t)) return "breastfeeding";
   if (hasAnyFast(t,["potassium","پوٹاشیم"]) && mentionsExtorFast(t)) return "potassium";
